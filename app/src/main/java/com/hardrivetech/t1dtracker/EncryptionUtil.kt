@@ -8,7 +8,9 @@ import android.security.KeyPairGeneratorSpec
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.io.IOException
 import java.math.BigInteger
+import java.security.GeneralSecurityException
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
@@ -44,14 +46,18 @@ object EncryptionUtil {
                     if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)) {
                         builder.setIsStrongBoxBacked(true)
                     }
-                } catch (_: Exception) {
-                    // Ignore and continue without StrongBox
+                } catch (se: SecurityException) {
+                    AppLog.w("EncryptionUtil", "StrongBox feature check failed: ${se.message}")
                 }
             }
 
             // Require randomized encryption (keystore-generated IV) when available (API >= N)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                try { builder.setRandomizedEncryptionRequired(true) } catch (_: Exception) { }
+                try {
+                    builder.setRandomizedEncryptionRequired(true)
+                } catch (se: SecurityException) {
+                    AppLog.w("EncryptionUtil", "Randomized encryption requirement not supported: ${se.message}")
+                }
             }
 
             val spec = builder.build()
@@ -100,11 +106,17 @@ object EncryptionUtil {
                 ensureWrapKeyExists(context, keyStore)
                 resultKey = generateAndWrapKeyIfPossible(keyStore, prefs, context)
             }
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
             resultKey = generateTransientKey()
             AppLog.w(
                 "EncryptionUtil",
                 "Keystore not available; returning transient AES key (no persistent storage)"
+            )
+        } catch (e: IOException) {
+            resultKey = generateTransientKey()
+            AppLog.w(
+                "EncryptionUtil",
+                "Keystore I/O failure; returning transient AES key (no persistent storage)"
             )
         }
         return resultKey!!
@@ -122,7 +134,9 @@ object EncryptionUtil {
             } else {
                 null
             }
-        } catch (_: Exception) {
+        } catch (e: GeneralSecurityException) {
+            null
+        } catch (e: IllegalArgumentException) {
             null
         }
     }
@@ -144,8 +158,11 @@ object EncryptionUtil {
                 kpg.initialize(spec)
                 kpg.generateKeyPair()
             }
-        } catch (_: Exception) {
+        } catch (e: GeneralSecurityException) {
             // If generating the wrap key fails, we'll fall back to transient key below.
+            AppLog.w("EncryptionUtil", "ensureWrapKeyExists failed: ${e.message}")
+        } catch (e: IllegalArgumentException) {
+            AppLog.w("EncryptionUtil", "ensureWrapKeyExists failed: ${e.message}")
         }
     }
 
@@ -168,10 +185,14 @@ object EncryptionUtil {
                 prefs.edit()
                     .putString("key_wrapped_b64", Base64.encodeToString(wrapped, Base64.NO_WRAP))
                     .apply()
-                try { toWrap.fill(0) } catch (_: Exception) {}
+                if (toWrap != null) {
+                    toWrap.fill(0)
+                }
                 return key
             }
-        } catch (_: Exception) {
+        } catch (e: GeneralSecurityException) {
+            // wrapping failed; fall through to transient key return
+        } catch (e: IllegalArgumentException) {
             // wrapping failed; fall through to transient key return
         }
 
@@ -212,9 +233,9 @@ object EncryptionUtil {
             return Base64.encodeToString(combined, Base64.NO_WRAP)
         } finally {
             // Zero sensitive temporary buffers (best-effort)
-            try { inputBytes?.fill(0) } catch (_: Exception) {}
-            try { iv?.fill(0) } catch (_: Exception) {}
-            try { cipherBytes?.fill(0) } catch (_: Exception) {}
+            inputBytes?.fill(0)
+            iv?.fill(0)
+            cipherBytes?.fill(0)
         }
     }
 
@@ -235,13 +256,15 @@ object EncryptionUtil {
             cipher.init(Cipher.DECRYPT_MODE, key, spec)
             plain = cipher.doFinal(cipherBytes)
             return String(plain, Charsets.UTF_8)
-        } catch (_: Exception) {
+        } catch (e: GeneralSecurityException) {
+            return null
+        } catch (e: IllegalArgumentException) {
             return null
         } finally {
-            try { iv?.fill(0) } catch (_: Exception) {}
-            try { cipherBytes?.fill(0) } catch (_: Exception) {}
-            try { plain?.fill(0) } catch (_: Exception) {}
-            try { combined?.fill(0) } catch (_: Exception) {}
+            iv?.fill(0)
+            cipherBytes?.fill(0)
+            plain?.fill(0)
+            combined?.fill(0)
         }
     }
 
@@ -268,18 +291,20 @@ object EncryptionUtil {
             // plain contains the Base64-encoded passphrase; decode it to raw bytes
             val decoded = try {
                 Base64.decode(plain, Base64.NO_WRAP)
-            } catch (_: Exception) {
+            } catch (e: IllegalArgumentException) {
                 null
             }
 
             return decoded
-        } catch (_: Exception) {
+        } catch (e: GeneralSecurityException) {
+            return null
+        } catch (e: IllegalArgumentException) {
             return null
         } finally {
-            try { iv?.fill(0) } catch (_: Exception) {}
-            try { cipherBytes?.fill(0) } catch (_: Exception) {}
-            try { plain?.fill(0) } catch (_: Exception) {}
-            try { combined?.fill(0) } catch (_: Exception) {}
+            iv?.fill(0)
+            cipherBytes?.fill(0)
+            plain?.fill(0)
+            combined?.fill(0)
         }
     }
 
@@ -316,10 +341,14 @@ object EncryptionUtil {
             kpg.initialize(spec)
             kpg.generateKeyPair()
             return true
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
             // Keystore not usable on this device or inaccessible in the current context.
             AppLog.w("EncryptionUtil", "Keystore unusable: ${e.message}")
-            try { TelemetryUtil.recordException(e, "isKeystoreUsable failed") } catch (_: Exception) { }
+            TelemetryUtil.recordException(e, "isKeystoreUsable failed")
+            return false
+        } catch (e: IOException) {
+            AppLog.w("EncryptionUtil", "Keystore I/O failure: ${e.message}")
+            TelemetryUtil.recordException(e, "isKeystoreUsable failed")
             return false
         }
     }
@@ -345,14 +374,25 @@ object EncryptionUtil {
                 val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
                 keyStore.load(null)
                 if (keyStore.containsAlias(KEY_ALIAS)) {
-                    try { keyStore.deleteEntry(KEY_ALIAS) } catch (_: Exception) { }
+                    try {
+                        keyStore.deleteEntry(KEY_ALIAS)
+                    } catch (ke: GeneralSecurityException) {
+                        AppLog.w("EncryptionUtil", "Failed to delete keystore entry: ${ke.message}")
+                    }
                 }
-            } catch (_: Exception) {
+            } catch (e: GeneralSecurityException) {
                 // If keystore not available, continue; createSecretKey will handle fallbacks
+                AppLog.w("EncryptionUtil", "Keystore access failed during rotate: ${e.message}")
+            } catch (e: IOException) {
+                AppLog.w("EncryptionUtil", "Keystore I/O failed during rotate: ${e.message}")
             }
 
             // Force creation of a fresh key under the same alias
-            try { createSecretKey(context) } catch (_: Exception) { }
+            try {
+                createSecretKey(context)
+            } catch (e: GeneralSecurityException) {
+                AppLog.w("EncryptionUtil", "createSecretKey during rotate failed: ${e.message}")
+            }
 
             // Re-encrypt the passphrase (Base64-encode raw bytes first)
             val passphraseBase64 = Base64.encodeToString(passphraseBytes, Base64.NO_WRAP)
@@ -360,13 +400,17 @@ object EncryptionUtil {
             prefs.edit().putString("db_pass_enc", newEnc).apply()
 
             // Zero sensitive buffers
-            try { passphraseBytes.fill(0) } catch (_: Exception) { }
-            try { passphraseBase64.toByteArray(Charsets.UTF_8).fill(0) } catch (_: Exception) { }
+            passphraseBytes.fill(0)
+            passphraseBase64.toByteArray(Charsets.UTF_8).fill(0)
 
             AppLog.i("EncryptionUtil", "Keystore key rotated for alias $KEY_ALIAS")
             return true
-        } catch (e: Exception) {
+        } catch (e: GeneralSecurityException) {
             AppLog.e("EncryptionUtil", "rotateKey failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "EncryptionUtil.rotateKey failed")
+            return false
+        } catch (e: IOException) {
+            AppLog.e("EncryptionUtil", "rotateKey I/O failed: ${e.message}", e)
             TelemetryUtil.recordException(e, "EncryptionUtil.rotateKey failed")
             return false
         }

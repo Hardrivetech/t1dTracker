@@ -8,7 +8,9 @@ object AppLog {
             val cls = Class.forName("com.hardrivetech.t1dtracker.BuildConfig")
             val f = cls.getField("DEBUG")
             f.getBoolean(null)
-        } catch (_: Throwable) {
+        } catch (e: ReflectiveOperationException) {
+            false
+        } catch (e: SecurityException) {
             false
         }
     }

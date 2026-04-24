@@ -17,8 +17,8 @@ import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
-import java.security.SecureRandom
 import java.security.GeneralSecurityException
+import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.sqlcipher.database.SQLiteDatabase
@@ -100,11 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .openHelperFactory(supportFactory)
                     .addMigrations(MIGRATION_1_2)
                     .build()
-                try {
-                    passBytes.fill(0)
-                } catch (t: Throwable) {
-                    AppLog.w("AppDatabase", "Failed to zero passBytes: ${t.message}")
-                }
+                passBytes.fill(0)
                 db
             } catch (e: UnsatisfiedLinkError) {
                 AppLog.e("AppDatabase", "Failed to create encrypted temp DB: ${e.message}")
@@ -229,11 +225,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val replaced = backupAndReplaceFiles(context, origFiles, tempFiles)
                 if (!replaced) return@withContext false
 
-                try {
-                    INSTANCE = null
-                } catch (t: Throwable) {
-                    AppLog.w("AppDatabase", "Failed to clear INSTANCE: ${t.message}")
-                }
+                INSTANCE = null
 
                 AppLog.i("AppDatabase", "Migration to encrypted DB completed")
                 return@withContext true
@@ -287,11 +279,7 @@ abstract class AppDatabase : RoomDatabase() {
                         builder.openHelperFactory(supportFactory)
                         builder.addMigrations(MIGRATION_1_2)
                         instance = builder.build()
-                        try {
-                            passphraseBytes.fill(0)
-                        } catch (t: Throwable) {
-                            AppLog.w("AppDatabase", "Failed to zero passphraseBytes: ${t.message}")
-                        }
+                        passphraseBytes.fill(0)
                     } catch (e: UnsatisfiedLinkError) {
                         AppLog.w("AppDatabase", "SQLCipher libs failed to load: ${e.message}")
                     } catch (e: SecurityException) {

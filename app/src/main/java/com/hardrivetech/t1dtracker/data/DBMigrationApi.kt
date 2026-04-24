@@ -4,6 +4,7 @@ import android.content.Context
 import com.hardrivetech.t1dtracker.AppLog
 import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,7 +26,7 @@ fun listMigrationBackups(context: Context): List<Long> {
             }
         }
         return set.toList().sortedDescending()
-    } catch (_: Exception) {
+    } catch (_: IOException) {
         return emptyList()
     }
 }
@@ -38,8 +39,17 @@ suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
             // Attempt to close current instance (best-effort)
             try {
                 val inst = AppDatabase.getInstance(context)
-                try { inst.close() } catch (_: Exception) { }
-            } catch (_: Exception) { }
+                try { inst.close() } catch (e: android.database.sqlite.SQLiteException) {
+                    AppLog.w(
+                        "DBMigrationApi",
+                        "Close DB failed: ${e.message}"
+                    )
+                } catch (e: IllegalStateException) { AppLog.w("DBMigrationApi", "Close DB failed: ${e.message}") }
+            } catch (e: IllegalStateException) {
+                AppLog.w("DBMigrationApi", "Get instance failed: ${e.message}")
+            } catch (e: android.database.sqlite.SQLiteException) {
+                AppLog.w("DBMigrationApi", "Get instance failed: ${e.message}")
+            }
 
             // Attempt to clear singleton INSTANCE via reflection (best-effort)
             try {
@@ -50,7 +60,11 @@ suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
                 val instField = companionObj.javaClass.getDeclaredField("INSTANCE")
                 instField.isAccessible = true
                 instField.set(companionObj, null)
-            } catch (_: Exception) { }
+            } catch (e: ReflectiveOperationException) {
+                AppLog.w("DBMigrationApi", "Reflection to clear INSTANCE failed: ${e.message}")
+            } catch (e: SecurityException) {
+                AppLog.w("DBMigrationApi", "Reflection security failure: ${e.message}")
+            }
 
             val backupDir = File(context.filesDir, "db_migration_backups")
             val expectedNames = listOf(dbFile.name, dbFile.name + "-shm", dbFile.name + "-wal")
@@ -71,8 +85,16 @@ suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
 
             AppLog.i("DBMigrationApi", "Restored DB backup $timestamp")
             true
-        } catch (e: Exception) {
-            AppLog.e("DBMigrationApi", "restoreMigrationBackup failed: ${e.message}", e)
+        } catch (e: IOException) {
+            AppLog.e("DBMigrationApi", "restoreMigrationBackup I/O failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "restoreMigrationBackup failed")
+            false
+        } catch (e: ReflectiveOperationException) {
+            AppLog.e("DBMigrationApi", "restoreMigrationBackup reflection failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "restoreMigrationBackup failed")
+            false
+        } catch (e: SecurityException) {
+            AppLog.e("DBMigrationApi", "restoreMigrationBackup security failed: ${e.message}", e)
             TelemetryUtil.recordException(e, "restoreMigrationBackup failed")
             false
         }

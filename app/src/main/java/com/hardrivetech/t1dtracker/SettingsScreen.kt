@@ -47,9 +47,12 @@ import com.hardrivetech.t1dtracker.data.listMigrationBackups
 import com.hardrivetech.t1dtracker.data.restoreMigrationBackup
 import com.hardrivetech.t1dtracker.util.PasswordStrength
 import java.io.File
+import java.io.IOException
+import java.security.GeneralSecurityException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONException
 
 @Composable
 fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -> Unit) {
@@ -100,7 +103,19 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                         out.write(encrypted.toByteArray(Charsets.UTF_8))
                     }
                     true
-                } catch (e: Exception) {
+                } catch (e: IOException) {
+                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
+                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
+                    false
+                } catch (e: GeneralSecurityException) {
+                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
+                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
+                    false
+                } catch (e: IllegalArgumentException) {
+                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
+                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
+                    false
+                } catch (e: JSONException) {
                     AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
                     TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
                     false
@@ -125,7 +140,15 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                     val tmp = File(context.cacheDir, "import_tmp.t1d")
                     ins.use { input -> tmp.outputStream().use { out -> input.copyTo(out) } }
                     BackupImporter.importEncryptedBackupFile(context, db, tmp, backupPassword.toCharArray())
-                } catch (e: Exception) {
+                } catch (e: IOException) {
+                    AppLog.e("SettingsScreen", "Import failed: ${e.message}", e)
+                    TelemetryUtil.recordException(e, "Import failed in Settings -> Import backup")
+                    false
+                } catch (e: GeneralSecurityException) {
+                    AppLog.e("SettingsScreen", "Import failed: ${e.message}", e)
+                    TelemetryUtil.recordException(e, "Import failed in Settings -> Import backup")
+                    false
+                } catch (e: IllegalArgumentException) {
                     AppLog.e("SettingsScreen", "Import failed: ${e.message}", e)
                     TelemetryUtil.recordException(e, "Import failed in Settings -> Import backup")
                     false
@@ -270,11 +293,7 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                             sharedPrefs.edit().putBoolean("allow_legacy_wrapped_encryption", true).apply()
                             allowLegacyPref = true
                             showLegacyConfirm = false
-                            val ok = try {
-                                EncryptionUtil.isKeystoreUsable(context)
-                            } catch (_: Exception) {
-                                false
-                            }
+                            val ok = EncryptionUtil.isKeystoreUsable(context)
                             if (ok) {
                                 Toast.makeText(
                                     context,
@@ -359,7 +378,23 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                                         context.getString(R.string.share_backup)
                                     )
                                 )
-                            } catch (e: Exception) {
+                            } catch (e: android.content.ActivityNotFoundException) {
+                                AppLog.e("SettingsScreen", "Share failed: ${e.message}", e)
+                                TelemetryUtil.recordException(e, "Share backup failed")
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.share_failed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (e: SecurityException) {
+                                AppLog.e("SettingsScreen", "Share failed: ${e.message}", e)
+                                TelemetryUtil.recordException(e, "Share backup failed")
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.share_failed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (e: IllegalArgumentException) {
                                 AppLog.e("SettingsScreen", "Share failed: ${e.message}", e)
                                 TelemetryUtil.recordException(e, "Share backup failed")
                                 Toast.makeText(
@@ -667,12 +702,8 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                     showRotateConfirm = false
                     scope.launch {
                         rotatingKeyInProgress = true
-                        val ok = try {
-                            withContext(Dispatchers.IO) {
-                                EncryptionUtil.rotateKey(context)
-                            }
-                        } catch (e: Exception) {
-                            false
+                        val ok = withContext(Dispatchers.IO) {
+                            EncryptionUtil.rotateKey(context)
                         }
                         rotatingKeyInProgress = false
                         if (ok) {

@@ -21,12 +21,16 @@ class T1DApplication : Application() {
                     )
                     // Default to disabled; enable only after explicit user consent.
                     setEnabled.invoke(crashInstance, false)
-                } catch (t: Throwable) {
-                    AppLog.i("T1DApplication", "Crashlytics not available: ${t.message}")
+                } catch (e: ReflectiveOperationException) {
+                    AppLog.i("T1DApplication", "Crashlytics not available: ${e.message}")
+                } catch (e: SecurityException) {
+                    AppLog.i("T1DApplication", "Crashlytics not available: ${e.message}")
                 }
             }
-        } catch (t: Throwable) {
-            AppLog.i("T1DApplication", "Firebase not configured: ${t.message}")
+        } catch (e: ReflectiveOperationException) {
+            AppLog.i("T1DApplication", "Firebase not configured: ${e.message}")
+        } catch (e: SecurityException) {
+            AppLog.i("T1DApplication", "Firebase not configured: ${e.message}")
         }
     }
 }

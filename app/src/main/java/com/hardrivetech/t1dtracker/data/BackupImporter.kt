@@ -1,12 +1,16 @@
 package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
+import android.database.sqlite.SQLiteException
 import androidx.room.withTransaction
 import com.hardrivetech.t1dtracker.AppLog
 import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
+import java.io.IOException
+import java.security.GeneralSecurityException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONException
 import org.json.JSONObject
 
 object BackupImporter {
@@ -48,19 +52,31 @@ object BackupImporter {
                         dao.insert(e)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: SQLiteException) {
                 AppLog.e("BackupImporter", "DB insert failed: ${e.message}", e)
                 TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile DB insert failed")
                 return false
             }
 
             return true
-        } catch (t: Throwable) {
-            AppLog.e("BackupImporter", "importEncryptedBackupFile failed: ${t.message}", t)
-            TelemetryUtil.recordException(t, "BackupImporter.importEncryptedBackupFile failed")
+        } catch (e: IOException) {
+            AppLog.e("BackupImporter", "importEncryptedBackupFile I/O failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
+            return false
+        } catch (e: JSONException) {
+            AppLog.e("BackupImporter", "importEncryptedBackupFile JSON parse failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
+            return false
+        } catch (e: GeneralSecurityException) {
+            AppLog.e("BackupImporter", "importEncryptedBackupFile crypto failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
+            return false
+        } catch (e: IllegalArgumentException) {
+            AppLog.e("BackupImporter", "importEncryptedBackupFile bad data: ${e.message}", e)
+            TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
             return false
         } finally {
-            try { password.fill('\u0000') } catch (_: Exception) { }
+            password.fill('\u0000')
         }
     }
 }

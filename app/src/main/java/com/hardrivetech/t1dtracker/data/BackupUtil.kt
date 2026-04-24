@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Base64
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -96,16 +98,16 @@ object BackupUtil {
 
                 val out = Base64.encodeToString(combined, Base64.NO_WRAP)
 
-                try { iv.fill(0) } catch (_: Exception) { }
-                try { cipherBytes.fill(0) } catch (_: Exception) { }
+                iv.fill(0)
+                cipherBytes.fill(0)
 
                 return out
             } finally {
-                if (tmpBytes != null) try { tmpBytes.fill(0) } catch (_: Exception) { }
+                tmpBytes?.fill(0)
             }
         } finally {
             // Clear password material from PBEKeySpec
-            try { spec.clearPassword() } catch (_: Exception) { }
+            spec.clearPassword()
         }
     }
 
@@ -160,16 +162,20 @@ object BackupUtil {
                     try {
                         plain
                     } finally {
-                        try { plain.fill(0) } catch (_: Exception) { }
+                        plain.fill(0)
                     }
                 } finally {
-                    if (tmpBytes != null) try { tmpBytes.fill(0) } catch (_: Exception) { }
+                    tmpBytes?.fill(0)
                 }
             } finally {
                 // Clear sensitive password material
-                try { spec.clearPassword() } catch (_: Exception) { }
+                spec.clearPassword()
             }
-        } catch (_: Exception) {
+        } catch (e: GeneralSecurityException) {
+            null
+        } catch (e: IllegalArgumentException) {
+            null
+        } catch (e: IOException) {
             null
         }
     }
@@ -193,11 +199,15 @@ object BackupUtil {
                 stream.write(encrypted.toByteArray(Charsets.UTF_8))
             }
             return outFile
-        } catch (_: Exception) {
+        } catch (e: IOException) {
+            return null
+        } catch (e: GeneralSecurityException) {
+            return null
+        } catch (e: IllegalArgumentException) {
             return null
         } finally {
             // Clear caller-provided password array (caller should pass a transient copy)
-            try { password.fill('\u0000') } catch (_: Exception) { }
+            password.fill('\u0000')
         }
     }
 }

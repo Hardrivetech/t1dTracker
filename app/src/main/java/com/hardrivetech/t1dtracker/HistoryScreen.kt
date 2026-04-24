@@ -590,7 +590,9 @@ private fun writeCacheAndShareFile(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, subject))
-    } catch (ex: Exception) {
+    } catch (ex: android.content.ActivityNotFoundException) {
+        Toast.makeText(context, "Export failed: ${ex.message}", Toast.LENGTH_LONG).show()
+    } catch (ex: SecurityException) {
         Toast.makeText(context, "Export failed: ${ex.message}", Toast.LENGTH_LONG).show()
     }
 }
@@ -614,7 +616,9 @@ private fun writeEncryptedCacheAndShareFile(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, subject))
-    } catch (ex: Exception) {
+    } catch (ex: android.content.ActivityNotFoundException) {
+        Toast.makeText(context, "Encrypted export failed: ${ex.message}", Toast.LENGTH_LONG).show()
+    } catch (ex: SecurityException) {
         Toast.makeText(context, "Encrypted export failed: ${ex.message}", Toast.LENGTH_LONG).show()
     }
 }
@@ -627,7 +631,9 @@ private fun shareText(context: Context, content: String, subject: String) {
             putExtra(Intent.EXTRA_TEXT, content)
         }
         context.startActivity(Intent.createChooser(intent, subject))
-    } catch (ex: Exception) {
+    } catch (ex: android.content.ActivityNotFoundException) {
+        Toast.makeText(context, "Share failed: ${ex.message}", Toast.LENGTH_LONG).show()
+    } catch (ex: SecurityException) {
         Toast.makeText(context, "Share failed: ${ex.message}", Toast.LENGTH_LONG).show()
     }
 }
@@ -663,13 +669,21 @@ private fun saveToDownloads(context: Context, filename: String, content: String,
         }
 
         Toast.makeText(context, "Saved to Downloads: $filename", Toast.LENGTH_LONG).show()
-    } catch (ex: Exception) {
+    } catch (ex: IOException) {
         // fallback: write to cache and inform user
         try {
             val f = File(context.cacheDir, filename)
             f.writeText(content)
             Toast.makeText(context, "Saved to app cache (Downloads failed): ${ex.message}", Toast.LENGTH_LONG).show()
-        } catch (_: Exception) {
+        } catch (e2: IOException) {
+            Toast.makeText(context, "Save failed: ${ex.message}", Toast.LENGTH_LONG).show()
+        }
+    } catch (ex: SecurityException) {
+        try {
+            val f = File(context.cacheDir, filename)
+            f.writeText(content)
+            Toast.makeText(context, "Saved to app cache (Downloads failed): ${ex.message}", Toast.LENGTH_LONG).show()
+        } catch (e2: IOException) {
             Toast.makeText(context, "Save failed: ${ex.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -684,10 +698,13 @@ private fun savePublicLegacy(context: Context, filename: String, content: String
         try {
             val uri = android.net.Uri.fromFile(outFile)
             context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri))
-        } catch (_: Exception) {
+        } catch (e: SecurityException) {
+            AppLog.w("HistoryScreen", "Broadcast failed: ${e.message}")
         }
         Toast.makeText(context, "Saved to Downloads: $filename", Toast.LENGTH_LONG).show()
-    } catch (ex: Exception) {
+    } catch (ex: IOException) {
+        Toast.makeText(context, "Failed to save to Downloads: ${ex.message}", Toast.LENGTH_LONG).show()
+    } catch (ex: SecurityException) {
         Toast.makeText(context, "Failed to save to Downloads: ${ex.message}", Toast.LENGTH_LONG).show()
     }
 }

@@ -15,7 +15,11 @@ object BiometricAuth {
             bm.canAuthenticate(
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
             ) == BiometricManager.BIOMETRIC_SUCCESS
-        } catch (_: Exception) {
+        } catch (e: IllegalArgumentException) {
+            AppLog.w("BiometricAuth", "Biometric check failed: ${e.message}")
+            false
+        } catch (e: SecurityException) {
+            AppLog.w("BiometricAuth", "Biometric check failed: ${e.message}")
             false
         }
     }

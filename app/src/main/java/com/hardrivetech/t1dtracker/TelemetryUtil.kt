@@ -14,8 +14,10 @@ object TelemetryUtil {
             val crashInstance = getInstance.invoke(null)
             val setEnabled = crashCls.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
             setEnabled.invoke(crashInstance, enabled)
-        } catch (t: Throwable) {
-            AppLog.i("TelemetryUtil", "Crashlytics not available: ${t.message}")
+        } catch (e: ReflectiveOperationException) {
+            AppLog.i("TelemetryUtil", "Crashlytics not available: ${e.message}")
+        } catch (e: SecurityException) {
+            AppLog.i("TelemetryUtil", "Crashlytics not available: ${e.message}")
         }
 
         try {
@@ -27,8 +29,10 @@ object TelemetryUtil {
                 Boolean::class.javaPrimitiveType
             )
             setEnabled.invoke(analyticsInstance, enabled)
-        } catch (t: Throwable) {
-            AppLog.i("TelemetryUtil", "Firebase Analytics not available: ${t.message}")
+        } catch (e: ReflectiveOperationException) {
+            AppLog.i("TelemetryUtil", "Firebase Analytics not available: ${e.message}")
+        } catch (e: SecurityException) {
+            AppLog.i("TelemetryUtil", "Firebase Analytics not available: ${e.message}")
         }
     }
 
@@ -44,8 +48,10 @@ object TelemetryUtil {
             val crashInstance = getInstance.invoke(null)
             val logMethod = crashCls.getMethod("log", String::class.java)
             logMethod.invoke(crashInstance, redacted)
-        } catch (t: Throwable) {
-            AppLog.i("TelemetryUtil", "Crashlytics log not available: ${t.message}")
+        } catch (e: ReflectiveOperationException) {
+            AppLog.i("TelemetryUtil", "Crashlytics log not available: ${e.message}")
+        } catch (e: SecurityException) {
+            AppLog.i("TelemetryUtil", "Crashlytics log not available: ${e.message}")
         }
     }
 
@@ -67,7 +73,9 @@ object TelemetryUtil {
             // also log the sanitized message
             val logMethod = crashCls.getMethod("log", String::class.java)
             logMethod.invoke(crashInstance, sanitizedMsg)
-        } catch (e: Throwable) {
+        } catch (e: ReflectiveOperationException) {
+            AppLog.e("TelemetryUtil", "Crashlytics recordException failed: ${e.message}", e)
+        } catch (e: SecurityException) {
             AppLog.e("TelemetryUtil", "Crashlytics recordException failed: ${e.message}", e)
         }
     }
