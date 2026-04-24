@@ -1,0 +1,1 @@
+Track insulin, carbs and glucose locally — simple dose calculator and encrypted backups.

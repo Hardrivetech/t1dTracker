@@ -1,0 +1,38 @@
+### Android / Kotlin / Gradle .gitignore
+
+# Gradle
+.gradle/
+/build/
+**/build/
+
+# Local configuration
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Keystore files
+*.jks
+*.keystore
+key.properties
+
+# Google services
+app/google-services.json
+
+# Android captures and caches
+/captures/
+/.cxx/
+.externalNativeBuild/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Misc
+*.log
+out/
+.hprof

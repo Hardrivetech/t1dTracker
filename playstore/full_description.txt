@@ -1,0 +1,10 @@
+t1dTracker helps people with Type 1 diabetes track insulin doses, carbohydrate intake, and glucose readings — all stored locally on your device.
+
+Features:
+- Simple insulin-to-carb and correction dose calculator with rounding options.
+- Local history of entries with edit and delete.
+- Encrypted backups using a password you control (PBKDF2 + AES-GCM).
+- Optional DB encryption with SQLCipher on supported devices (keystore-gated).
+- Migration and rollback tooling: automatic pre-migration backups and one-tap restore.
+
+Your data stays on your device unless you choose to export it.

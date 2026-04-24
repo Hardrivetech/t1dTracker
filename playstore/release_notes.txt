@@ -1,0 +1,6 @@
+Release notes (draft)
+
+v0.1.0 — Initial release
+- Local insulin, carbs, and glucose tracking
+- Insulin-to-carb and correction dose calculator
+- Encrypted backup/export and migration tooling

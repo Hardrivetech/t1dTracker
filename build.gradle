@@ -1,0 +1,29 @@
+buildscript {
+    ext.kotlin_version = '1.8.10'
+    repositories {
+        google()
+        mavenCentral()
+        // Required for some Gradle plugins (detekt, ktlint)
+        maven { url 'https://plugins.gradle.org/m2/' }
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.0.2"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // Google services and Firebase Crashlytics Gradle plugins
+        classpath 'com.google.gms:google-services:4.3.15'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.5'
+        // Static analysis plugins
+        // Correct groupId for detekt Gradle plugin
+        classpath "io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.0"
+        classpath "org.jlleitschuh.gradle:ktlint-gradle:11.6.0"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // Include Gradle Plugin Portal mirror for plugins published there
+        maven { url 'https://plugins.gradle.org/m2/' }
+    }
+}

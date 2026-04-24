@@ -1,0 +1,4 @@
+package_name("com.hardrivetech.t1dtracker")
+package_name "com.hardrivetech.t1dtracker"
+# supply_json_path: provide a path to service account JSON or set GOOGLE_PLAY_JSON env in CI
+json_key_file("./fastlane/google_play_api.json")

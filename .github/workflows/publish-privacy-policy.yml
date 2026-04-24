@@ -1,0 +1,36 @@
+name: Publish Privacy Policy
+
+on:
+  push:
+    paths:
+      - 'docs/PRIVACY_POLICY.md'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy privacy policy to GitHub Pages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare site content
+        run: |
+          set -e
+          mkdir -p site-content
+          if [ -f docs/PRIVACY_POLICY.md ]; then
+            cp docs/PRIVACY_POLICY.md site-content/index.md
+          else
+            echo "# Privacy Policy" > site-content/index.md
+            echo "Privacy policy file not found." >> site-content/index.md
+          fi
+          cat > site-content/_config.yml <<'EOF'
+          title: t1dTracker Privacy Policy
+          markdown: kramdown
+          EOF
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site-content

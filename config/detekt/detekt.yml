@@ -1,0 +1,15 @@
+# Detekt configuration (minimal placeholder)
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+
+processors:
+  active: true
+
+formatting:
+  active: true
+
+comments:
+  active: true

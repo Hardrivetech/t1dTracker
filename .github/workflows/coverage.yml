@@ -1,0 +1,34 @@
+name: Coverage
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Run tests and generate JaCoCo report
+        run: |
+          ./gradlew test jacocoTestReport --no-daemon
+        env:
+          JAVA_TOOL_OPTIONS: '-Dfile.encoding=UTF8'
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">t1dTracker</string>
+    <string name="toggle_desc">Toggle</string>
+    <string name="settings_desc">Settings</string>
+
+    <string name="carbs_label">Carbohydrates (g)</string>
+    <string name="icr_label">ICR (g per unit)</string>
+    <string name="current_glucose_label">Current glucose (mg/dL)</string>
+    <string name="target_glucose_label">Target glucose (mg/dL)</string>
+    <string name="isf_label">ISF (mg/dL per unit)</string>
+    <string name="rounding_label">Rounding step (units)</string>
+
+    <string name="carb_dose_label">Carb dose</string>
+    <string name="correction_dose_label">Correction dose</string>
+    <string name="total_dose_label">Total dose (rounded %1$sU)</string>
+
+    <string name="save_entry">Save entry</string>
+    <string name="entry_saved">Entry saved</string>
+    <string name="recent_entries">Recent entries:</string>
+
+    <string name="default_settings_title">Default settings</string>
+    <string name="calculator_title">Calculator</string>
+    <string name="history_title">History</string>
+    <string name="rotate_key">Rotate encryption key</string>
+    <string name="rotate_key_confirm">Rotate the keystore-backed encryption key? The database passphrase will be re-encrypted with a new keystore key. Create a backup first if you are unsure.</string>
+    <string name="rotate_key_success">Encryption key rotated successfully</string>
+    <string name="rotate_key_failed">Encryption key rotation failed</string>
+    <string name="default_icr_label">Default ICR (g per unit)</string>
+    <string name="default_isf_label">Default ISF (mg/dL per unit)</string>
+    <string name="default_target_label">Default Target Glucose (mg/dL)</string>
+
+    <string name="allow_telemetry">Allow telemetry</string>
+    <string name="privacy_policy_button">Privacy policy</string>
+    <string name="require_biometric">Require biometric</string>
+    <string name="biometric_unavailable_disabling">Biometric unavailable; disabling</string>
+    <string name="biometric_unavailable">Biometric unavailable</string>
+    <string name="biometric_not_supported">Biometric not supported on this device</string>
+    <string name="biometric_enabled">Biometric enabled</string>
+    <string name="authentication_failed">Authentication failed</string>
+
+    <string name="allow_legacy_encryption">Enable wrapped-key encryption on older devices (advanced)</string>
+    <string name="allow_legacy_encryption_warning_title">Enable legacy encryption?</string>
+    <string name="allow_legacy_encryption_warning_text">Enabling wrapped-key encryption on older devices (API &lt; 23) is less secure. Only enable if you understand the risks. Create an exported backup before migrating.</string>
+    <string name="allow_legacy_encryption_disabled">Legacy encryption disabled</string>
+
+    <string name="backup_password_label">Backup password</string>
+    <string name="export_backup">Export backup</string>
+    <string name="share_backup">Share backup</string>
+    <string name="share_failed">Share failed</string>
+    <string name="backup_exported">Backup exported</string>
+    <string name="backup_export_failed">Backup failed</string>
+    <string name="backup_saved">Backup saved: %1$s</string>
+
+    <string name="migrate_db_title">Migrate DB to encrypted</string>
+    <string name="migration_recommendation">We strongly recommend exporting a backup before migrating your database. You can export now using the password above or proceed if you already have a backup.</string>
+    <string name="last_backup_label">Last backup: %1$s</string>
+    <string name="export_now">Export now</string>
+    <string name="proceed">Proceed</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="migrating_title">Migrating...</string>
+    <string name="migrating_text">Please wait — do not close the app</string>
+    <string name="no_migration_backups">No migration backups available</string>
+
+    <string name="migration_complete">Migration complete — please restart the app</string>
+    <string name="migration_failed">Migration failed or not needed</string>
+
+    <string name="restore_pre_migration">Restore pre-migration backup</string>
+    <string name="restore_backup_question">Restore backup from %1$s? This will replace your current database.</string>
+    <string name="restore_latest_question">Restore latest backup? This will replace your current database.</string>
+    <string name="restore_button">Restore</string>
+    <string name="restore_complete">Restore complete — please restart the app</string>
+    <string name="restore_failed">Restore failed</string>
+
+    <string name="import_backup">Import backup</string>
+    <string name="import_success">Import successful</string>
+    <string name="import_failed">Import failed</string>
+
+    <string name="backup_recommendations_title">Backup &amp; recovery guidance</string>
+    <string name="backup_rec_1">Use a password manager to store your backup password.</string>
+    <string name="backup_rec_2">Create an exported backup before migrating the DB.</string>
+    <string name="backup_rec_3">Keep at least one external copy (encrypted) in a secure location.</string>
+    <string name="backup_rec_4">Verify a backup by importing it into a test device when possible.</string>
+    <string name="restore_notes_1">The app keeps internal timestamped backups under files/db_migration_backups/ before migration.</string>
+    <string name="restore_notes_2">Use Settings → Restore pre-migration backup to revert to a saved backup; restart the app after restore.</string>
+
+    <string name="privacy_policy_title">Privacy policy</string>
+    <string name="privacy_policy_contact">To request data deletion or help, contact: hardrivetech@proton.me</string>
+    <string name="save">Save</string>
+    <string name="close">Close</string>
+</resources>

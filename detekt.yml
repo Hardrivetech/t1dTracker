@@ -1,0 +1,15 @@
+# Minimal detekt configuration - build upon default config
+# Adjust rules as your project needs evolve.
+build:
+  maxIssues: 0
+
+processors:
+  active: true
+
+comments:
+  active: true
+
+# You can disable or tune specific rules below.
+style:
+  MagicNumber:
+    active: false

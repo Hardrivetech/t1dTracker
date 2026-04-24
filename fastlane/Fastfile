@@ -1,0 +1,38 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build debug APK"
+  lane :assemble_debug do
+    gradle(task: "clean assembleDebug")
+  end
+
+  desc "Build release bundle (signing config required in CI)"
+  lane :release do
+    gradle(task: "clean bundleRelease")
+    UI.message("Release bundle generated. Configure Fastlane supply or Play Store upload in CI.")
+  end
+end
+default_platform(:android)
+
+platform :android do
+  desc "Prepare release metadata (dry-run)"
+  lane :prepare_release do
+    UI.message("Preparing release metadata — dry run. Configure lanes before running for real.")
+    # Example: gradle(task: "bundle", build_type: "Release")
+    # Example: supply(track: 'internal', json_key: ENV['GOOGLE_PLAY_JSON'])
+  end
+
+  desc "Build and upload to internal track (manual; ensure secrets configured)"
+  lane :internal do
+    UI.message("This lane is a scaffold: uncomment build/upload steps after reviewing and configuring secrets.")
+    # gradle(task: "bundle", build_type: "Release")
+    # supply(track: 'internal', json_key: ENV['GOOGLE_PLAY_JSON'])
+  end
+
+  desc "Release to production (manual)"
+  lane :release do
+    UI.message("Production release lane scaffold — configure with care.")
+    # gradle(task: "assemble", build_type: "Release")
+    # supply(track: 'production', json_key: ENV['GOOGLE_PLAY_JSON'])
+  end
+end

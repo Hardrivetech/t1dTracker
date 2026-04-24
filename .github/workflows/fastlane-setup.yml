@@ -1,0 +1,14 @@
+name: Fastlane Setup Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-fastlane:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for fastlane files
+        run: |
+          if [ -f fastlane/Fastfile ]; then echo 'Fastfile present'; else echo 'No Fastfile'; fi
+          if [ -d fastlane/metadata ]; then echo 'Fastlane metadata present'; else echo 'No metadata'; fi

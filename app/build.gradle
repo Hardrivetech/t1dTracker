@@ -1,0 +1,148 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'kotlin-kapt'
+}
+
+// Apply static analysis plugins (classpath provided in root build.gradle)
+apply plugin: 'io.gitlab.arturbosch.detekt'
+apply plugin: 'org.jlleitschuh.gradle.ktlint'
+
+android {
+    compileSdkVersion 33
+
+    defaultConfig {
+        applicationId "com.hardrivetech.t1dtracker"
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "0.1"
+    }
+
+    // Signing and release config: allows building a release bundle locally/CI
+    signingConfigs {
+        release {
+            // Prefer explicit properties (set via gradle.properties or CI secrets)
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                storeFile file(project.property("RELEASE_STORE_FILE"))
+                storePassword project.findProperty("RELEASE_STORE_PASSWORD") ?: ""
+                keyAlias project.findProperty("RELEASE_KEY_ALIAS") ?: ""
+                keyPassword project.findProperty("RELEASE_KEY_PASSWORD") ?: ""
+            } else {
+                // Fallback to the debug keystore for local/CI verification only (NOT for Play Store)
+                def debugKeystore = System.getProperty("user.home") + "/.android/debug.keystore"
+                if (file(debugKeystore).exists()) {
+                    storeFile file(debugKeystore)
+                    storePassword "android"
+                    keyAlias "androiddebugkey"
+                    keyPassword "android"
+                }
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    buildFeatures {
+        compose true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.4.3'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    namespace "com.hardrivetech.t1dtracker"
+    
+    packagingOptions {
+        // Ensure SQLCipher native library is included and pick first to avoid duplicates
+        pickFirst "lib/**/libsqlcipher.so"
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation "androidx.core:core-ktx:1.10.0"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.1"
+    implementation "androidx.activity:activity-compose:1.7.1"
+    implementation "androidx.compose.ui:ui:1.4.3"
+    implementation "androidx.compose.material:material:1.4.3"
+    implementation "com.google.android.material:material:1.9.0"
+    implementation "androidx.compose.ui:ui-tooling-preview:1.4.3"
+    implementation "androidx.compose.material:material-icons-extended:1.4.3"
+    implementation "androidx.room:room-runtime:2.5.2"
+    kapt "androidx.room:room-compiler:2.5.2"
+    implementation "androidx.room:room-ktx:2.5.2"
+    implementation "androidx.datastore:datastore-preferences:1.0.0"
+    implementation "androidx.biometric:biometric:1.1.0"
+    // SQLCipher for Room (encrypted database)
+    implementation "net.zetetic:android-database-sqlcipher:4.5.0"
+    // Coroutines for background tasks and import/export
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    // Firebase Crashlytics (optional - requires google-services JSON)
+    implementation 'com.google.firebase:firebase-crashlytics-ktx:18.4.1'
+    implementation 'com.google.firebase:firebase-analytics-ktx:21.4.0'
+    testImplementation 'junit:junit:4.13.2'
+    // Android instrumentation test dependencies
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:rules:1.5.0'
+    // Room migration testing
+    androidTestImplementation 'androidx.room:room-testing:2.5.2'
+    androidTestImplementation 'androidx.sqlite:sqlite-framework:2.2.0'
+    // Android instrumentation test dependencies
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:rules:1.5.0'
+}
+
+// Detekt configuration
+detekt {
+    toolVersion = "1.23.0"
+    config = files("$rootDir/detekt.yml")
+    buildUponDefaultConfig = true
+}
+
+// ktlint configuration
+ktlint {
+    android = true
+    ignoreFailures = false
+    verbose = true
+}
+
+// Apply Firebase/Crashlytics Gradle plugins only when google-services.json exists
+def googleServicesFile = file("$projectDir/google-services.json")
+def enableFirebase = project.hasProperty("enableFirebase") || System.getenv("ENABLE_FIREBASE") == "true"
+if (googleServicesFile.exists() && enableFirebase) {
+    apply plugin: 'com.google.firebase.crashlytics'
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    if (!googleServicesFile.exists()) {
+        println "Skipping Firebase plugins: google-services.json not found in ${projectDir}"
+    } else {
+        println "Skipping Firebase plugins: enableFirebase not set. To enable, run with '-PenableFirebase=true' or set env var ENABLE_FIREBASE=true"
+    }
+}
