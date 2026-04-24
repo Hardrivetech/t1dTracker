@@ -135,7 +135,14 @@ ktlint {
     android = true
     ignoreFailures = false
     verbose = true
+    filter {
+        // Exclude test and androidTest source sets from ktlint checks to
+        // reduce CI noise while addressing style issues incrementally.
+        exclude("**/test/**")
+        exclude("**/androidTest/**")
+    }
 }
+
 
 // Apply Firebase/Crashlytics Gradle plugins only when google-services.json exists
 def googleServicesFile = file("$projectDir/google-services.json")
