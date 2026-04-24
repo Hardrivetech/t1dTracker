@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.security.KeyPairGeneratorSpec
 import android.util.Base64
+import androidx.core.content.edit
 import java.io.IOException
 import java.math.BigInteger
 import java.security.GeneralSecurityException
@@ -15,7 +16,6 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 import javax.security.auth.x500.X500Principal
-import androidx.core.content.edit
 
 // Helper functions extracted from EncryptionUtil to reduce object size and complexity
 internal fun getSecretKeyLegacy(context: Context): SecretKey {

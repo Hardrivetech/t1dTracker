@@ -1,7 +1,6 @@
 package com.hardrivetech.t1dtracker
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
 import android.security.KeyPairGeneratorSpec
 import android.security.keystore.KeyGenParameterSpec
@@ -27,51 +26,9 @@ object EncryptionUtil {
     private const val IV_SIZE = 12
     private const val WRAP_KEY_ALIAS = "t1d_t1dtracker_key_v1_wrap"
 
-    // Small helpers extracted to reduce nested block depth in main flows.
-    private fun tryApplyStrongBox(builder: KeyGenParameterSpec.Builder, context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            try {
-                if (context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)) {
-                    builder.setIsStrongBoxBacked(true)
-                }
-            } catch (se: SecurityException) {
-                AppLog.w("EncryptionUtil", "StrongBox feature check failed: ${se.message}")
-                TelemetryUtil.recordException(se, "createSecretKey StrongBox feature check failed")
-            }
-        }
-    }
-
-    private fun tryRequireRandomizedEncryption(builder: KeyGenParameterSpec.Builder) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            try {
-                builder.setRandomizedEncryptionRequired(true)
-            } catch (se: SecurityException) {
-                AppLog.w("EncryptionUtil", "Randomized encryption requirement not supported: ${se.message}")
-                TelemetryUtil.recordException(se, "createSecretKey randomized encryption requirement failed")
-            }
-        }
-    }
-
-    private fun tryDeleteKeystoreEntry(alias: String) {
-        try {
-            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-            keyStore.load(null)
-            if (keyStore.containsAlias(alias)) {
-                try {
-                    keyStore.deleteEntry(alias)
-                } catch (ke: GeneralSecurityException) {
-                    AppLog.w("EncryptionUtil", "Failed to delete keystore entry: ${ke.message}")
-                    TelemetryUtil.recordException(ke, "tryDeleteKeystoreEntry failed")
-                }
-            }
-        } catch (e: GeneralSecurityException) {
-            AppLog.w("EncryptionUtil", "Keystore access failed during delete: ${e.message}")
-            TelemetryUtil.recordException(e, "tryDeleteKeystoreEntry failed")
-        } catch (e: IOException) {
-            AppLog.w("EncryptionUtil", "Keystore I/O failed during delete: ${e.message}")
-            TelemetryUtil.recordException(e, "tryDeleteKeystoreEntry failed")
-        }
-    }
+    // Keystore helper functions (tryApplyStrongBox, tryRequireRandomizedEncryption,
+    // tryDeleteKeystoreEntry) were extracted to EncryptionKeystoreHelpers.kt to
+    // reduce the number of functions inside this object for static analysis.
 
     private fun createSecretKey(context: Context): SecretKey {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -210,48 +167,20 @@ object EncryptionUtil {
      */
     fun decryptAndDecodeBase64(context: Context, dataB64: String?): ByteArray? {
         var result: ByteArray? = null
-        var combined: ByteArray? = null
-        var iv: ByteArray? = null
-        var cipherBytes: ByteArray? = null
+        var parts: CombinedParts? = null
         var plain: ByteArray? = null
         try {
-            if (dataB64 != null) {
-                combined = Base64.decode(dataB64, Base64.NO_WRAP)
-                if (combined.size >= IV_SIZE) {
-                    iv = combined.copyOfRange(0, IV_SIZE)
-                    cipherBytes = combined.copyOfRange(IV_SIZE, combined.size)
-                    val key = getSecretKey(context)
-                    val cipher = Cipher.getInstance(AES_MODE)
-                    val spec = GCMParameterSpec(128, iv)
-                    cipher.init(Cipher.DECRYPT_MODE, key, spec)
-                    plain = cipher.doFinal(cipherBytes)
-                    // plain contains the Base64-encoded passphrase; decode it to raw bytes
-                    result = try {
-                        Base64.decode(plain, Base64.NO_WRAP)
-                    } catch (e: IllegalArgumentException) {
-                        AppLog.w("EncryptionUtil", "Base64 decode failed in decryptAndDecodeBase64: ${e.message}")
-                        TelemetryUtil.recordException(e, "decryptAndDecodeBase64 Base64 decode failed")
-                        null
-                    }
-                } else {
-                    AppLog.w("EncryptionUtil", "decryptAndDecodeBase64 failed (input too short)")
-                    TelemetryUtil.recordException(
-                        IllegalArgumentException("input too short"),
-                        "decryptAndDecodeBase64 failed"
-                    )
-                }
+            parts = splitCombinedParts(dataB64)
+            if (parts != null) {
+                val key = getSecretKey(context)
+                plain = decryptCombined(key, parts.iv, parts.cipherBytes, AES_MODE)
+                result = decodeBase64OrNull(plain)
             }
-        } catch (e: GeneralSecurityException) {
-            AppLog.w("EncryptionUtil", "decryptAndDecodeBase64 failed (crypto): ${e.message}")
-            TelemetryUtil.recordException(e, "decryptAndDecodeBase64 failed")
-        } catch (e: IllegalArgumentException) {
-            AppLog.w("EncryptionUtil", "decryptAndDecodeBase64 failed (invalid data): ${e.message}")
-            TelemetryUtil.recordException(e, "decryptAndDecodeBase64 failed")
         } finally {
-            iv?.fill(0)
-            cipherBytes?.fill(0)
+            parts?.iv?.fill(0)
+            parts?.cipherBytes?.fill(0)
+            parts?.combined?.fill(0)
             plain?.fill(0)
-            combined?.fill(0)
         }
 
         return result
@@ -323,7 +252,7 @@ object EncryptionUtil {
         try {
             val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
             val enc = prefs.getString("db_pass_enc", null)
-                ?: throw IllegalStateException("db_pass_enc missing; nothing to rotate")
+                ?: error("db_pass_enc missing; nothing to rotate")
 
             // Decrypt to raw passphrase bytes (not a String) so we can zero them safely
             val passphraseBytes = decryptAndDecodeBase64(context, enc)

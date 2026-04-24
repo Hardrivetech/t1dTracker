@@ -1,17 +1,14 @@
 package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
-import android.database.sqlite.SQLiteException
 import android.os.Build
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
-import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.hardrivetech.t1dtracker.AppLog
 import com.hardrivetech.t1dtracker.EncryptionUtil
-import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -49,19 +46,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // Helpers to keep migratePlaintextToEncrypted concise and reduce cyclomatic complexity
-        private fun readEntriesSafe(currentDb: AppDatabase): List<InsulinEntry>? {
-            return try {
-                currentDb.insulinDao().getAll()
-            } catch (e: SQLiteException) {
-                AppLog.e("AppDatabase", "Failed to read existing DB: ${e.message}", e)
-                TelemetryUtil.recordException(e, "migrate: read existing DB failed")
-                null
-            }
-        }
-
         // persistNewPassphrase moved to AppDatabaseHelpers to reduce companion size
-
         private fun tryLoadSqlCipher(context: Context): Boolean {
             return try {
                 SQLiteDatabase.loadLibs(context)
@@ -93,62 +78,11 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        private fun importEntriesToDb(tempDb: AppDatabase, entries: List<InsulinEntry>): Boolean {
-            return try {
-                tempDb.withTransaction {
-                    val dao = tempDb.insulinDao()
-                    for (e in entries) {
-                        dao.insert(e.copy(id = 0L))
-                    }
-                }
-                true
-            } catch (e: SQLiteException) {
-                AppLog.e("AppDatabase", "Failed to import into encrypted DB: ${e.message}", e)
-                TelemetryUtil.recordException(e, "migrate: import failed")
-                try {
-                    tempDb.close()
-                } catch (ioe: IOException) {
-                    AppLog.w("AppDatabase", "Failed closing tempDb after import failure: ${ioe.message}")
-                }
-                false
-            }
-        }
+        // importEntriesToDb moved to AppDatabaseMigrationHelpers to reduce companion size
 
         private fun backupAndReplaceFiles(context: Context, origFiles: List<File>, tempFiles: List<File>): Boolean {
-            try {
-                val backupDir = File(context.filesDir, "db_migration_backups")
-                if (!backupDir.exists()) backupDir.mkdirs()
-                val ts = System.currentTimeMillis()
-                for (f in origFiles) {
-                    if (f.exists()) {
-                        try {
-                            val dst = File(backupDir, "${f.name}.$ts.bak")
-                            f.copyTo(dst, overwrite = true)
-                        } catch (e: IOException) {
-                            AppLog.w("AppDatabase", "Failed to copy ${f.name} to backup: ${e.message}")
-                        }
-                    }
-                }
-            } catch (e: IOException) {
-                AppLog.w("AppDatabase", "Unable to create DB backups before migration: ${e.message}")
-            }
-
-            return try {
-                for (f in origFiles) if (f.exists()) f.delete()
-                for ((src, dst) in tempFiles.zip(origFiles)) {
-                    if (src.exists()) {
-                        if (!src.renameTo(dst)) {
-                            src.copyTo(dst, overwrite = true)
-                            src.delete()
-                        }
-                    }
-                }
-                true
-            } catch (e: IOException) {
-                AppLog.e("AppDatabase", "Failed to atomically replace DB files: ${e.message}", e)
-                TelemetryUtil.recordException(e, "migrate: file replace failed")
-                false
-            }
+            createDbMigrationBackups(context, origFiles)
+            return replaceDbFiles(origFiles, tempFiles)
         }
         suspend fun migratePlaintextToEncrypted(context: Context, currentDb: AppDatabase): Boolean {
             return withContext(Dispatchers.IO) {

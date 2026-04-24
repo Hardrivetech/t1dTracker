@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object SettingsActions {
+    @Suppress("TooGenericExceptionCaught")
     suspend fun performExportToUri(
         context: Context,
         db: AppDatabase,
@@ -43,11 +44,17 @@ object SettingsActions {
                 TelemetryUtil.recordException(e, "Export failed in SettingsActions.performExportToUri")
                 false
             } finally {
-                try { password.fill('\u0000') } catch (_: Exception) {}
+                kotlin.runCatching {
+                    password.fill('\u0000')
+                }.onFailure { e ->
+                    AppLog.w("SettingsActions", "Password zeroing failed: ${e.message}")
+                    TelemetryUtil.recordException(e, "SettingsActions: password zeroing failed")
+                }
             }
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     suspend fun performImportFromUri(
         context: Context,
         db: AppDatabase,
@@ -73,7 +80,12 @@ object SettingsActions {
                 TelemetryUtil.recordException(e, "Import failed in SettingsActions.performImportFromUri")
                 false
             } finally {
-                try { password.fill('\u0000') } catch (_: Exception) {}
+                kotlin.runCatching {
+                    password.fill('\u0000')
+                }.onFailure { e ->
+                    AppLog.w("SettingsActions", "Password zeroing failed: ${e.message}")
+                    TelemetryUtil.recordException(e, "SettingsActions: password zeroing failed")
+                }
             }
         }
     }

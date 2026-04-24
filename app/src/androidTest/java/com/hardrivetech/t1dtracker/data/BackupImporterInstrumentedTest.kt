@@ -27,7 +27,9 @@ class BackupImporterInstrumentedTest {
 
     @After
     fun tearDown() {
-        try { db.close() } catch (_: Exception) { }
+        try { db.close() } catch (e: Exception) {
+            AppLog.w("BackupImporterInstrumentedTest", "Close DB failed: ${e.message}")
+        }
     }
 
     @Test
@@ -75,6 +77,8 @@ class BackupImporterInstrumentedTest {
         val all = db.insulinDao().getAll()
         assertEquals(entries.size, all.size)
 
-        try { outFile.delete() } catch (_: Exception) { }
+        try { outFile.delete() } catch (e: Exception) {
+            AppLog.w("BackupImporterInstrumentedTest", "Delete temp file failed: ${e.message}")
+        }
     }
 }

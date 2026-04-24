@@ -1,7 +1,7 @@
 package com.hardrivetech.t1dtracker
 
+import android.annotation.SuppressLint
 import android.app.Activity
-import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -18,6 +18,7 @@ import androidx.compose.material.Button
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.hardrivetech.t1dtracker.data.AppDatabase
@@ -53,7 +56,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Ensure the system status bar matches the app purple color
-        window.statusBarColor = AndroidColor.parseColor("#6200EE")
+        window.statusBarColor = "#6200EE".toColorInt()
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         val db = AppDatabase.getInstance(applicationContext)
         val prefs = PrefsRepository(applicationContext)
@@ -63,6 +66,7 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+@SuppressLint("ContextCastToActivity")
 @Composable
 fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
     var screen by remember { mutableStateOf("calculator") }

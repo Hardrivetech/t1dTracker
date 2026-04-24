@@ -2,6 +2,8 @@ package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
 import android.util.Base64
+import com.hardrivetech.t1dtracker.AppLog
+import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException

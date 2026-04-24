@@ -13,22 +13,17 @@ import kotlinx.coroutines.withContext
  * companion to avoid cross-file companion resolution issues during compilation.
  */
 fun listMigrationBackups(context: Context): List<Long> {
-    try {
-        val backupDir = File(context.filesDir, "db_migration_backups")
-        if (!backupDir.exists()) return emptyList()
+    val backupDir = File(context.filesDir, "db_migration_backups")
+    val set = mutableSetOf<Long>()
+    val files = if (backupDir.exists()) backupDir.listFiles() else null
+    if (files != null) {
         val regex = Regex("\\.(\\d+)\\.bak$")
-        val set = mutableSetOf<Long>()
-        backupDir.listFiles()?.forEach { f ->
-            val m = regex.find(f.name)
-            if (m != null) {
-                val ts = m.groupValues[1].toLongOrNull()
-                if (ts != null) set.add(ts)
-            }
+        for (f in files) {
+            val m = regex.find(f.name) ?: continue
+            m.groupValues[1].toLongOrNull()?.let { set.add(it) }
         }
-        return set.toList().sortedDescending()
-    } catch (_: IOException) {
-        return emptyList()
     }
+    return set.toList().sortedDescending()
 }
 
 suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
@@ -36,35 +31,8 @@ suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
         try {
             val dbFile = context.getDatabasePath("t1d_db")
 
-            // Attempt to close current instance (best-effort)
-            try {
-                val inst = AppDatabase.getInstance(context)
-                try { inst.close() } catch (e: android.database.sqlite.SQLiteException) {
-                    AppLog.w(
-                        "DBMigrationApi",
-                        "Close DB failed: ${e.message}"
-                    )
-                } catch (e: IllegalStateException) { AppLog.w("DBMigrationApi", "Close DB failed: ${e.message}") }
-            } catch (e: IllegalStateException) {
-                AppLog.w("DBMigrationApi", "Get instance failed: ${e.message}")
-            } catch (e: android.database.sqlite.SQLiteException) {
-                AppLog.w("DBMigrationApi", "Get instance failed: ${e.message}")
-            }
-
-            // Attempt to clear singleton INSTANCE via reflection (best-effort)
-            try {
-                val appDbClass = Class.forName("com.hardrivetech.t1dtracker.data.AppDatabase")
-                val companionField = appDbClass.getDeclaredField("Companion")
-                companionField.isAccessible = true
-                val companionObj = companionField.get(null)
-                val instField = companionObj.javaClass.getDeclaredField("INSTANCE")
-                instField.isAccessible = true
-                instField.set(companionObj, null)
-            } catch (e: ReflectiveOperationException) {
-                AppLog.w("DBMigrationApi", "Reflection to clear INSTANCE failed: ${e.message}")
-            } catch (e: SecurityException) {
-                AppLog.w("DBMigrationApi", "Reflection security failure: ${e.message}")
-            }
+            tryCloseDatabaseInstance(context)
+            tryClearAppDbSingletonViaReflection()
 
             val backupDir = File(context.filesDir, "db_migration_backups")
             val expectedNames = listOf(dbFile.name, dbFile.name + "-shm", dbFile.name + "-wal")
@@ -99,3 +67,36 @@ suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
             false
         }
     }
+
+private fun tryCloseDatabaseInstance(context: Context) {
+    try {
+        val inst = AppDatabase.getInstance(context)
+        try {
+            inst.close()
+        } catch (e: android.database.sqlite.SQLiteException) {
+            AppLog.w("DBMigrationApi", "Close DB failed: ${e.message}")
+        } catch (e: IllegalStateException) {
+            AppLog.w("DBMigrationApi", "Close DB failed: ${e.message}")
+        }
+    } catch (e: IllegalStateException) {
+        AppLog.w("DBMigrationApi", "Get instance failed: ${e.message}")
+    } catch (e: android.database.sqlite.SQLiteException) {
+        AppLog.w("DBMigrationApi", "Get instance failed: ${e.message}")
+    }
+}
+
+private fun tryClearAppDbSingletonViaReflection() {
+    try {
+        val appDbClass = Class.forName("com.hardrivetech.t1dtracker.data.AppDatabase")
+        val companionField = appDbClass.getDeclaredField("Companion")
+        companionField.isAccessible = true
+        val companionObj = companionField.get(null)
+        val instField = companionObj.javaClass.getDeclaredField("INSTANCE")
+        instField.isAccessible = true
+        instField.set(companionObj, null)
+    } catch (e: ReflectiveOperationException) {
+        AppLog.w("DBMigrationApi", "Reflection to clear INSTANCE failed: ${e.message}")
+    } catch (e: SecurityException) {
+        AppLog.w("DBMigrationApi", "Reflection security failure: ${e.message}")
+    }
+}
