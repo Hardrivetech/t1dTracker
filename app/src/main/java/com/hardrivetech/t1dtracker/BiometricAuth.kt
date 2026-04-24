@@ -32,7 +32,8 @@ object BiometricAuth {
             val promptInfo = builder.build()
 
             val prompt = BiometricPrompt(
-                activity, executor,
+                activity,
+                executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         if (cont.isActive) cont.resume(true)

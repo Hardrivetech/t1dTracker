@@ -1,6 +1,7 @@
 package com.hardrivetech.t1dtracker
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.security.KeyPairGeneratorSpec
@@ -65,98 +66,122 @@ object EncryptionUtil {
     }
 
     private fun getSecretKey(context: Context): SecretKey {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            getSecretKeyModern(context)
+        } else {
+            getSecretKeyLegacy(context)
+        }
+    }
+
+    private fun getSecretKeyModern(context: Context): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+        val entry = keyStore.getEntry(KEY_ALIAS, null)
+        return if (entry != null && entry is KeyStore.SecretKeyEntry) {
+            entry.secretKey
+        } else {
+            createSecretKey(context)
+        }
+    }
+
+    private fun getSecretKeyLegacy(context: Context): SecretKey {
+        val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
+        val wrappedB64 = prefs.getString("key_wrapped_b64", null)
+        var resultKey: SecretKey? = null
+        try {
             val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
             keyStore.load(null)
-            val entry = keyStore.getEntry(KEY_ALIAS, null)
-            if (entry != null && entry is KeyStore.SecretKeyEntry) {
-                return entry.secretKey
+
+            if (wrappedB64 != null && keyStore.containsAlias(WRAP_KEY_ALIAS)) {
+                resultKey = tryUnwrapWrappedKey(keyStore, wrappedB64)
             }
-            return createSecretKey(context)
-        } else {
-            // Pre-M fallback: attempt to wrap an AES key with an RSA key stored in AndroidKeyStore.
-            // If wrapping isn't available, fall back to storing the raw key (insecure) and log a warning.
-            val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
-            val wrappedB64 = prefs.getString("key_wrapped_b64", null)
-            try {
-                val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-                keyStore.load(null)
 
-                // If we have a wrapped key stored and a private key in the keystore, unwrap it.
-                if (wrappedB64 != null && keyStore.containsAlias(WRAP_KEY_ALIAS)) {
-                    try {
-                        val wrapped = Base64.decode(wrappedB64, Base64.NO_WRAP)
-                        val privateKey = keyStore.getKey(WRAP_KEY_ALIAS, null) as? java.security.PrivateKey
-                        if (privateKey != null) {
-                            val rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding")
-                            rsa.init(Cipher.DECRYPT_MODE, privateKey)
-                            val aesBytes = rsa.doFinal(wrapped)
-                            return SecretKeySpec(aesBytes, "AES")
-                        }
-                    } catch (_: Exception) {
-                        // continue to regenerate/wrap
-                    }
-                }
-
-                // Ensure an RSA wrap key exists (KeyPairGeneratorSpec for API 18-22)
-                try {
-                    if (!keyStore.containsAlias(WRAP_KEY_ALIAS)) {
-                        val kpg = KeyPairGenerator.getInstance("RSA", ANDROID_KEYSTORE)
-                        val start = Calendar.getInstance()
-                        val end = Calendar.getInstance()
-                        end.add(Calendar.YEAR, 30)
-                        val spec = KeyPairGeneratorSpec.Builder(context)
-                            .setAlias(WRAP_KEY_ALIAS)
-                            .setSubject(X500Principal("CN=$WRAP_KEY_ALIAS"))
-                            .setSerialNumber(BigInteger.ONE)
-                            .setStartDate(start.time)
-                            .setEndDate(end.time)
-                            .build()
-                        kpg.initialize(spec)
-                        kpg.generateKeyPair()
-                    }
-                } catch (_: Exception) {
-                    // If generating the wrap key fails, we'll fall back below.
-                }
-
-                // Generate AES key and try to wrap with the keystore public key
-                val kg = KeyGenerator.getInstance("AES")
-                kg.init(256)
-                val key = kg.generateKey()
-                try {
-                    val cert = keyStore.getCertificate(WRAP_KEY_ALIAS)
-                    if (cert != null) {
-                        val publicKey = cert.publicKey
-                        val rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding")
-                        rsa.init(Cipher.ENCRYPT_MODE, publicKey)
-                        val toWrap = key.encoded
-                        val wrapped = rsa.doFinal(toWrap)
-                        prefs.edit().putString("key_wrapped_b64", Base64.encodeToString(wrapped, Base64.NO_WRAP)).apply()
-                        try { toWrap.fill(0) } catch (_: Exception) { }
-                        return key
-                    }
-                } catch (_: Exception) {
-                    // wrapping failed; fall through to insecure storage
-                }
-
-                // As a last resort, do NOT persist raw key (insecure). Return transient key only.
-                AppLog.w(
-                    "EncryptionUtil",
-                    "Wrapping unavailable on pre-M device; returning transient AES key (no persistent storage)"
-                )
-                return key
-            } catch (e: Exception) {
-                // If keystore not accessible, return a transient AES key (do NOT persist raw key)
-                val kg = KeyGenerator.getInstance("AES")
-                kg.init(256)
-                val key = kg.generateKey()
-                AppLog.w(
-                    "EncryptionUtil",
-                    "Keystore not available; returning transient AES key (no persistent storage)"
-                )
-                return key
+            if (resultKey == null) {
+                ensureWrapKeyExists(context, keyStore)
+                resultKey = generateAndWrapKeyIfPossible(keyStore, prefs, context)
             }
+        } catch (e: Exception) {
+            resultKey = generateTransientKey()
+            AppLog.w(
+                "EncryptionUtil",
+                "Keystore not available; returning transient AES key (no persistent storage)"
+            )
         }
+        return resultKey!!
+    }
+
+    private fun tryUnwrapWrappedKey(keyStore: KeyStore, wrappedB64: String): SecretKey? {
+        return try {
+            val wrapped = Base64.decode(wrappedB64, Base64.NO_WRAP)
+            val privateKey = keyStore.getKey(WRAP_KEY_ALIAS, null) as? java.security.PrivateKey
+            if (privateKey != null) {
+                val rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding")
+                rsa.init(Cipher.DECRYPT_MODE, privateKey)
+                val aesBytes = rsa.doFinal(wrapped)
+                SecretKeySpec(aesBytes, "AES")
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun ensureWrapKeyExists(context: Context, keyStore: KeyStore) {
+        try {
+            if (!keyStore.containsAlias(WRAP_KEY_ALIAS)) {
+                val kpg = KeyPairGenerator.getInstance("RSA", ANDROID_KEYSTORE)
+                val start = Calendar.getInstance()
+                val end = Calendar.getInstance()
+                end.add(Calendar.YEAR, 30)
+                val spec = KeyPairGeneratorSpec.Builder(context)
+                    .setAlias(WRAP_KEY_ALIAS)
+                    .setSubject(X500Principal("CN=$WRAP_KEY_ALIAS"))
+                    .setSerialNumber(BigInteger.ONE)
+                    .setStartDate(start.time)
+                    .setEndDate(end.time)
+                    .build()
+                kpg.initialize(spec)
+                kpg.generateKeyPair()
+            }
+        } catch (_: Exception) {
+            // If generating the wrap key fails, we'll fall back to transient key below.
+        }
+    }
+
+    private fun generateAndWrapKeyIfPossible(
+        keyStore: KeyStore,
+        prefs: SharedPreferences,
+        context: Context
+    ): SecretKey {
+        val kg = KeyGenerator.getInstance("AES")
+        kg.init(256)
+        val key = kg.generateKey()
+        try {
+            val cert = keyStore.getCertificate(WRAP_KEY_ALIAS)
+            if (cert != null) {
+                val publicKey = cert.publicKey
+                val rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding")
+                rsa.init(Cipher.ENCRYPT_MODE, publicKey)
+                val toWrap = key.encoded
+                val wrapped = rsa.doFinal(toWrap)
+                prefs.edit()
+                    .putString("key_wrapped_b64", Base64.encodeToString(wrapped, Base64.NO_WRAP))
+                    .apply()
+                try { toWrap.fill(0) } catch (_: Exception) {}
+                return key
+            }
+        } catch (_: Exception) {
+            // wrapping failed; fall through to transient key return
+        }
+
+        return key
+    }
+
+    private fun generateTransientKey(): SecretKey {
+        val kg = KeyGenerator.getInstance("AES")
+        kg.init(256)
+        return kg.generateKey()
     }
 
     fun encryptString(context: Context, plain: String): String {

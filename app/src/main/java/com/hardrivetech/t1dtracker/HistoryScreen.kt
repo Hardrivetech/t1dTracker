@@ -15,8 +15,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -108,7 +119,11 @@ fun HistoryScreen(db: AppDatabase) {
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = {
                 val now2 = System.currentTimeMillis()
-                val cutoff2 = if (filterState.value == Int.MAX_VALUE) 0L else now2 - filterState.value * 24L * 60L * 60L * 1000L
+                val cutoff2 = if (filterState.value == Int.MAX_VALUE) {
+                    0L
+                } else {
+                    now2 - filterState.value * 24L * 60L * 60L * 1000L
+                }
                 entriesToExport = entriesState.value.filter { it.timestamp >= cutoff2 }.sortedBy { it.timestamp }
                 showExportDialog = true
             }) { Text("Export") }
@@ -117,7 +132,11 @@ fun HistoryScreen(db: AppDatabase) {
         Spacer(modifier = Modifier.height(12.dp))
 
         val now = System.currentTimeMillis()
-        val cutoff = if (filterState.value == Int.MAX_VALUE) 0L else now - filterState.value * 24L * 60L * 60L * 1000L
+        val cutoff = if (filterState.value == Int.MAX_VALUE) {
+            0L
+        } else {
+            now - filterState.value * 24L * 60L * 60L * 1000L
+        }
         val filtered = entriesState.value.filter { it.timestamp >= cutoff }.sortedBy { it.timestamp }
 
         if (filtered.isEmpty()) {
@@ -140,9 +159,9 @@ fun HistoryScreen(db: AppDatabase) {
             Spacer(modifier = Modifier.height(8.dp))
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(filtered) { e ->
-                    Text(
-                        "${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g — ${e.currentGlucose} mg/dL"
-                    )
+                    val itemText = "${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g — " +
+                        "${e.currentGlucose} mg/dL"
+                    Text(itemText)
                 }
             }
         }
@@ -251,7 +270,11 @@ fun HistoryScreen(db: AppDatabase) {
                         val newIsf = editIsfText.toDoubleOrNull() ?: orig.isf
 
                         val newCarbDose = if (newIcr > 0.0) newCarbs / newIcr else 0.0
-                        val newCorrection = if (newIsf > 0.0 && newCurrent > newTarget) (newCurrent - newTarget) / newIsf else 0.0
+                        val newCorrection = if (newIsf > 0.0 && newCurrent > newTarget) {
+                            (newCurrent - newTarget) / newIsf
+                        } else {
+                            0.0
+                        }
                         val newTotal = newCarbDose + newCorrection
 
                         val updated = orig.copy(
@@ -472,11 +495,15 @@ private fun escapeHtml(s: String): String {
 private fun buildHtml(entries: List<InsulinEntry>): String {
     val sb = StringBuilder()
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-    sb.append("<!doctype html><html><head><meta charset=\"utf-8\"><title>t1dTracker export</title></head><body>")
+    sb.append("<!doctype html><html><head>")
+    sb.append("<meta charset=\"utf-8\"><title>t1dTracker export</title>")
+    sb.append("</head><body>")
     sb.append("<h1>t1dTracker export</h1>")
-    sb.append(
-        "<table border=\"1\" cellpadding=\"4\"><tr><th>id</th><th>timestamp</th><th>datetime</th><th>carbs</th><th>icr</th><th>currentGlucose</th><th>targetGlucose</th><th>isf</th><th>carbDose</th><th>correctionDose</th><th>totalDose</th><th>notes</th></tr>"
-    )
+    sb.append("<table border=\"1\" cellpadding=\"4\">")
+    sb.append("<tr><th>id</th><th>timestamp</th><th>datetime</th>")
+    sb.append("<th>carbs</th><th>icr</th><th>currentGlucose</th>")
+    sb.append("<th>targetGlucose</th><th>isf</th><th>carbDose</th>")
+    sb.append("<th>correctionDose</th><th>totalDose</th><th>notes</th></tr>")
     for (e in entries) {
         val date = sdf.format(java.util.Date(e.timestamp))
         val notesEscaped = escapeHtml(e.notes ?: "")
@@ -667,16 +694,15 @@ private fun savePublicLegacy(context: Context, filename: String, content: String
 
 private fun buildCsv(entries: List<InsulinEntry>): String {
     val sb = StringBuilder()
-    sb.append(
-        "id,timestamp,datetime,carbs,icr,currentGlucose,targetGlucose,isf,carbDose,correctionDose,totalDose,notes\n"
-    )
+    sb.append("id,timestamp,datetime,carbs,icr,currentGlucose,")
+    sb.append("targetGlucose,isf,carbDose,correctionDose,totalDose,notes\n")
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     for (e in entries) {
         val date = sdf.format(java.util.Date(e.timestamp))
         val notesEscaped = e.notes?.replace("\"", "\"\"") ?: ""
-        sb.append(
-            "${e.id},${e.timestamp},\"${date}\",${e.carbs},${e.icr},${e.currentGlucose},${e.targetGlucose},${e.isf},${e.carbDose},${e.correctionDose},${e.totalDose},\"${notesEscaped}\"\n"
-        )
+        sb.append("${e.id},${e.timestamp},\"${date}\",")
+        sb.append("${e.carbs},${e.icr},${e.currentGlucose},${e.targetGlucose},${e.isf},")
+        sb.append("${e.carbDose},${e.correctionDose},${e.totalDose},\"${notesEscaped}\"\n")
     }
     return sb.toString()
 }
@@ -781,7 +807,9 @@ fun LineChart(
 
                     fun xPos(x: Long): Float {
                         if (visibleXMax == visibleXMin) return leftPaddingPx + chartWidth / 2f
-                        return leftPaddingPx + ((x - visibleXMin).toFloat() / (visibleXMax - visibleXMin).toFloat()) * chartWidth
+                        val denom = (visibleXMax - visibleXMin).toFloat()
+                        val frac = (x - visibleXMin).toFloat() / denom
+                        return leftPaddingPx + frac * chartWidth
                     }
 
                     fun yPos(y: Double): Float {
@@ -823,7 +851,9 @@ fun LineChart(
 
             fun xPos(x: Long): Float {
                 if (visibleXMax == visibleXMin) return leftPaddingPx + chartWidth / 2f
-                return leftPaddingPx + ((x - visibleXMin).toFloat() / (visibleXMax - visibleXMin).toFloat()) * chartWidth
+                val denom = (visibleXMax - visibleXMin).toFloat()
+                val frac = (x - visibleXMin).toFloat() / denom
+                return leftPaddingPx + frac * chartWidth
             }
 
             fun yPos(y: Double): Float {
@@ -849,7 +879,12 @@ fun LineChart(
                     end = Offset(leftPaddingPx + chartWidth, y)
                 )
                 val labelText = if (yValue % 1.0 == 0.0) "%.0f".format(yValue) else "%.1f".format(yValue)
-                drawContext.canvas.nativeCanvas.drawText(labelText, 4f, y + labelPaint.textSize / 2f, labelPaint)
+                drawContext.canvas.nativeCanvas.drawText(
+                    labelText,
+                    4f,
+                    y + labelPaint.textSize / 2f,
+                    labelPaint
+                )
             }
 
             // draw x-axis labels based on visible window (start, mid, end)
@@ -868,7 +903,11 @@ fun LineChart(
 
             // draw smooth path for visible points
             val pointCords = points.mapIndexedNotNull { _, p ->
-                if (p.first !in visibleXMin..visibleXMax) null else Offset(xPos(p.first), yPos(p.second))
+                if (p.first !in visibleXMin..visibleXMax) {
+                    null
+                } else {
+                    Offset(xPos(p.first), yPos(p.second))
+                }
             }
 
             val path = Path()
@@ -885,7 +924,11 @@ fun LineChart(
                 path.lineTo(last.x, last.y)
             }
 
-            drawPath(path = path, color = Color(0xFF0077CC), style = Stroke(width = 3f, cap = StrokeCap.Round))
+            drawPath(
+                path = path,
+                color = Color(0xFF0077CC),
+                style = Stroke(width = 3f, cap = StrokeCap.Round)
+            )
 
             // draw points for visible cords
             points.forEachIndexed { idx, p ->
@@ -903,10 +946,11 @@ fun LineChart(
             }
 
             // border around chart area
+            val chartSize = androidx.compose.ui.geometry.Size(chartWidth, chartHeight)
             drawRect(
                 color = Color.LightGray,
                 topLeft = Offset(leftPaddingPx, topPaddingPx),
-                size = androidx.compose.ui.geometry.Size(chartWidth, chartHeight),
+                size = chartSize,
                 style = Stroke(width = 1f)
             )
         }
@@ -919,8 +963,14 @@ fun LineChart(
             val text = "$date: ${p.second} mg/dL"
             val tooltipDpX = with(density) { selectedOffset.x.toDp() }
             val tooltipDpY = with(density) { (selectedOffset.y - 36f).toDp() }
-            Card(modifier = Modifier.offset(x = tooltipDpX, y = tooltipDpY)) {
-                Text(text = text, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.body2)
+            Card(
+                modifier = Modifier.offset(x = tooltipDpX, y = tooltipDpY)
+            ) {
+                Text(
+                    text = text,
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.body2
+                )
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
+import android.database.sqlite.SQLiteException
 import android.os.Build
 import android.util.Base64
 import androidx.core.content.edit
@@ -15,22 +16,20 @@ import com.hardrivetech.t1dtracker.EncryptionUtil
 import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
 import java.security.SecureRandom
+import java.security.GeneralSecurityException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
-
 @Database(entities = [InsulinEntry::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun insulinDao(): InsulinDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
-
         // Migration from schema version 1 -> 2: add the optional `notes` column
-        // to `insulin_entries`. This is non-destructive and will add a NULLabel
+        // to `insulin_entries`. This is non-destructive and will add a NULLable
         // TEXT column for older databases.
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
@@ -38,261 +37,292 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * Migrate an existing plaintext DB to an encrypted SQLCipher DB using a
-         * keystore-protected passphrase. This performs an export-import into a
-         * temporary encrypted DB and then atomically replaces the original DB
-         * files on disk. Caller should run this off the main thread.
-         *
-         * Returns true on success.
-         */
+        private fun isPlainSqlite(dbFile: File): Boolean {
+            if (!dbFile.exists()) return false
+            return try {
+                FileInputStream(dbFile).use { fis ->
+                    val header = ByteArray(16)
+                    if (fis.read(header) != 16) {
+                        false
+                    } else {
+                        String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
+                    }
+                }
+            } catch (_: IOException) {
+                false
+            }
+        }
+
+        // Helpers to keep migratePlaintextToEncrypted concise and reduce cyclomatic complexity
+        private fun readEntriesSafe(currentDb: AppDatabase): List<InsulinEntry>? {
+            return try {
+                currentDb.insulinDao().getAll()
+            } catch (e: SQLiteException) {
+                AppLog.e("AppDatabase", "Failed to read existing DB: ${e.message}", e)
+                TelemetryUtil.recordException(e, "migrate: read existing DB failed")
+                null
+            }
+        }
+
+        private fun persistNewPassphrase(context: Context): ByteArray? {
+            return try {
+                val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
+                val bytes = ByteArray(32)
+                SecureRandom().nextBytes(bytes)
+                val passphraseBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                val enc = EncryptionUtil.encryptString(context, passphraseBase64)
+                prefs.edit { putString("db_pass_enc", enc) }
+                bytes
+            } catch (e: GeneralSecurityException) {
+                AppLog.e("AppDatabase", "Failed to generate/persist DB passphrase: ${e.message}", e)
+                TelemetryUtil.recordException(e, "migrate: passphrase generation failed")
+                null
+            }
+        }
+
+        private fun tryLoadSqlCipher(context: Context): Boolean {
+            return try {
+                SQLiteDatabase.loadLibs(context)
+                true
+            } catch (e: UnsatisfiedLinkError) {
+                AppLog.e("AppDatabase", "SQLCipher libs failed to load")
+                false
+            } catch (e: SecurityException) {
+                AppLog.e("AppDatabase", "SQLCipher libs failed to load: ${e.message}")
+                false
+            }
+        }
+
+        private fun createTempEncryptedDb(context: Context, passBytes: ByteArray, tempName: String): AppDatabase? {
+            return try {
+                val supportFactory = SupportFactory(passBytes)
+                val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, tempName)
+                    .openHelperFactory(supportFactory)
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                try {
+                    passBytes.fill(0)
+                } catch (t: Throwable) {
+                    AppLog.w("AppDatabase", "Failed to zero passBytes: ${t.message}")
+                }
+                db
+            } catch (e: UnsatisfiedLinkError) {
+                AppLog.e("AppDatabase", "Failed to create encrypted temp DB: ${e.message}")
+                null
+            } catch (e: SecurityException) {
+                AppLog.e("AppDatabase", "Failed to create encrypted temp DB: ${e.message}")
+                null
+            }
+        }
+
+        private fun importEntriesToDb(tempDb: AppDatabase, entries: List<InsulinEntry>): Boolean {
+            return try {
+                tempDb.withTransaction {
+                    val dao = tempDb.insulinDao()
+                    for (e in entries) {
+                        dao.insert(e.copy(id = 0L))
+                    }
+                }
+                true
+            } catch (e: SQLiteException) {
+                AppLog.e("AppDatabase", "Failed to import into encrypted DB: ${e.message}", e)
+                TelemetryUtil.recordException(e, "migrate: import failed")
+                try {
+                    tempDb.close()
+                } catch (ioe: IOException) {
+                    AppLog.w("AppDatabase", "Failed closing tempDb after import failure: ${ioe.message}")
+                }
+                false
+            }
+        }
+
+        private fun backupAndReplaceFiles(context: Context, origFiles: List<File>, tempFiles: List<File>): Boolean {
+            try {
+                val backupDir = File(context.filesDir, "db_migration_backups")
+                if (!backupDir.exists()) backupDir.mkdirs()
+                val ts = System.currentTimeMillis()
+                for (f in origFiles) {
+                    if (f.exists()) {
+                        try {
+                            val dst = File(backupDir, "${f.name}.$ts.bak")
+                            f.copyTo(dst, overwrite = true)
+                        } catch (e: IOException) {
+                            AppLog.w("AppDatabase", "Failed to copy ${f.name} to backup: ${e.message}")
+                        }
+                    }
+                }
+            } catch (e: IOException) {
+                AppLog.w("AppDatabase", "Unable to create DB backups before migration: ${e.message}")
+            }
+
+            return try {
+                for (f in origFiles) if (f.exists()) f.delete()
+                for ((src, dst) in tempFiles.zip(origFiles)) {
+                    if (src.exists()) {
+                        if (!src.renameTo(dst)) {
+                            src.copyTo(dst, overwrite = true)
+                            src.delete()
+                        }
+                    }
+                }
+                true
+            } catch (e: IOException) {
+                AppLog.e("AppDatabase", "Failed to atomically replace DB files: ${e.message}", e)
+                TelemetryUtil.recordException(e, "migrate: file replace failed")
+                false
+            }
+        }
         suspend fun migratePlaintextToEncrypted(context: Context, currentDb: AppDatabase): Boolean {
             return withContext(Dispatchers.IO) {
-                try {
-                    val shared = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
-                    val allowLegacy = shared.getBoolean("allow_legacy_wrapped_encryption", false)
-                    val keystoreAvailable = EncryptionUtil.isKeystoreUsable(context)
-                    if (!keystoreAvailable || (Build.VERSION.SDK_INT < Build.VERSION_CODES.M && !allowLegacy)) {
-                        AppLog.w(
-                            "AppDatabase",
-                            "Keystore not usable or device API < M (and legacy not allowed); cannot migrate to encrypted DB"
-                        )
-                        return@withContext false
-                    }
-
-                    val dbFile = context.getDatabasePath("t1d_db")
-                    fun isPlainSqlite(f: File): Boolean {
-                        return try {
-                            if (!f.exists() || f.length() < 16) return false
-                            FileInputStream(f).use { fis ->
-                                val header = ByteArray(16)
-                                val read = fis.read(header)
-                                if (read < 16) return false
-                                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
-                            }
-                        } catch (_: Exception) {
-                            false
-                        }
-                    }
-
-                    if (!dbFile.exists() || !isPlainSqlite(dbFile)) {
-                        AppLog.i("AppDatabase", "No plaintext DB detected; migration not needed")
-                        return@withContext false
-                    }
-
-                    // Export current data
-                    val entries = try {
-                        currentDb.insulinDao().getAll()
-                    } catch (e: Exception) {
-                        AppLog.e("AppDatabase", "Failed to read existing DB: ${e.message}", e)
-                        TelemetryUtil.recordException(e, "migrate: read existing DB failed")
-                        return@withContext false
-                    }
-
-                    // Generate a fresh random passphrase and persist encrypted in prefs
-                    val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
-                    val passBytes = ByteArray(32)
-                    SecureRandom().nextBytes(passBytes)
-                    val passB64 = Base64.encodeToString(passBytes, Base64.NO_WRAP)
-                    val enc = EncryptionUtil.encryptString(context, passB64)
-                    prefs.edit { putString("db_pass_enc", enc) }
-
-                    // Initialize SQLCipher and open a temporary encrypted DB
-                    try {
-                        SQLiteDatabase.loadLibs(context)
-                    } catch (_: Exception) {
-                        // library init may fail; abort
-                        AppLog.e("AppDatabase", "SQLCipher libs failed to load")
-                        return@withContext false
-                    }
-
-                    val supportFactory = SupportFactory(passBytes)
-                    try { passBytes.fill(0) } catch (_: Exception) { }
-
-                    val tempName = "t1d_db_encrypted_tmp"
-                    val tempDb = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, tempName)
-                        .openHelperFactory(supportFactory)
-                        .addMigrations(MIGRATION_1_2)
-                        .build()
-
-                    // Import entries into the temp encrypted DB
-                    try {
-                        // Use the suspend-friendly withTransaction so we can call suspend DAO methods
-                        tempDb.withTransaction {
-                            val dao = tempDb.insulinDao()
-                            for (e in entries) {
-                                val toInsert = e.copy(id = 0L)
-                                dao.insert(toInsert)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        AppLog.e("AppDatabase", "Failed to import into encrypted DB: ${e.message}", e)
-                        TelemetryUtil.recordException(e, "migrate: import failed")
-                        try { tempDb.close() } catch (_: Exception) { }
-                        return@withContext false
-                    }
-
-                    // Close DBs and swap files
-                    try { currentDb.close() } catch (_: Exception) { }
-                    try { tempDb.close() } catch (_: Exception) { }
-
-                    val origFiles = listOf(
-                        dbFile,
-                        File(dbFile.absolutePath + "-shm"),
-                        File(dbFile.absolutePath + "-wal")
+                val shared = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
+                val allowLegacy = shared.getBoolean("allow_legacy_wrapped_encryption", false)
+                val keystoreAvailable = EncryptionUtil.isKeystoreUsable(context)
+                if (!keystoreAvailable || (Build.VERSION.SDK_INT < Build.VERSION_CODES.M && !allowLegacy)) {
+                    AppLog.w(
+                        "AppDatabase",
+                        "Keystore not usable or device API < M (and legacy not allowed); cannot migrate to encrypted DB"
                     )
-                    val tempFile = context.getDatabasePath(tempName)
-                    val tempFiles = listOf(
-                        tempFile,
-                        File(tempFile.absolutePath + "-shm"),
-                        File(tempFile.absolutePath + "-wal")
-                    )
-
-                    // Back up originals before replacing them
-                    try {
-                        val backupDir = File(context.filesDir, "db_migration_backups")
-                        if (!backupDir.exists()) backupDir.mkdirs()
-                        val ts = System.currentTimeMillis()
-                        for (f in origFiles) {
-                            if (f.exists()) {
-                                try {
-                                    val dst = File(backupDir, "${f.name}.$ts.bak")
-                                    f.copyTo(dst, overwrite = true)
-                                } catch (e: Exception) {
-                                    AppLog.w("AppDatabase", "Failed to copy ${f.name} to backup: ${e.message}")
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        AppLog.w("AppDatabase", "Unable to create DB backups before migration: ${e.message}")
-                    }
-
-                    // Remove originals then move temp into place
-                    try {
-                        for (f in origFiles) if (f.exists()) f.delete()
-                        for ((src, dst) in tempFiles.zip(origFiles)) {
-                            if (src.exists()) {
-                                if (!src.renameTo(dst)) {
-                                    // fallback to copy
-                                    src.copyTo(dst, overwrite = true)
-                                    src.delete()
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        AppLog.e("AppDatabase", "Failed to atomically replace DB files: ${e.message}", e)
-                        TelemetryUtil.recordException(e, "migrate: file replace failed")
-                        return@withContext false
-                    }
-
-                    // Clear singleton so next getInstance opens the encrypted DB
-                    try { INSTANCE = null } catch (_: Exception) { }
-
-                    AppLog.i("AppDatabase", "Migration to encrypted DB completed")
-                    return@withContext true
-                } catch (e: Exception) {
-                    AppLog.e("AppDatabase", "migratePlaintextToEncrypted failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "migratePlaintextToEncrypted failed")
                     return@withContext false
                 }
+
+                val dbFile = context.getDatabasePath("t1d_db")
+                if (!dbFile.exists() || !isPlainSqlite(dbFile)) {
+                    AppLog.i("AppDatabase", "No plaintext DB detected; migration not needed")
+                    return@withContext false
+                }
+
+                val entries = readEntriesSafe(currentDb) ?: return@withContext false
+
+                val passBytes = persistNewPassphrase(context) ?: return@withContext false
+
+                if (!tryLoadSqlCipher(context)) return@withContext false
+
+                val tempName = "t1d_db_encrypted_tmp"
+                val tempDb = createTempEncryptedDb(context, passBytes, tempName) ?: return@withContext false
+
+                val imported = importEntriesToDb(tempDb, entries)
+                if (!imported) return@withContext false
+
+                try {
+                    currentDb.close()
+                } catch (e: IOException) {
+                    AppLog.w("AppDatabase", "Failed closing currentDb: ${e.message}")
+                }
+                try {
+                    tempDb.close()
+                } catch (e: IOException) {
+                    AppLog.w("AppDatabase", "Failed closing tempDb: ${e.message}")
+                }
+
+                val origFiles = listOf(
+                    dbFile,
+                    File(dbFile.absolutePath + "-shm"),
+                    File(dbFile.absolutePath + "-wal")
+                )
+                val tempFile = context.getDatabasePath(tempName)
+                val tempFiles = listOf(
+                    tempFile,
+                    File(tempFile.absolutePath + "-shm"),
+                    File(tempFile.absolutePath + "-wal")
+                )
+
+                val replaced = backupAndReplaceFiles(context, origFiles, tempFiles)
+                if (!replaced) return@withContext false
+
+                try {
+                    INSTANCE = null
+                } catch (t: Throwable) {
+                    AppLog.w("AppDatabase", "Failed to clear INSTANCE: ${t.message}")
+                }
+
+                AppLog.i("AppDatabase", "Migration to encrypted DB completed")
+                return@withContext true
             }
 
             // migration backup helpers moved to DBMigrationApi.kt to avoid companion/static call issues
         }
+        private fun keystoreEnabled(context: Context): Boolean {
+            val shared = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
+            val allowLegacy = shared.getBoolean("allow_legacy_wrapped_encryption", false)
+            return EncryptionUtil.isKeystoreUsable(context) &&
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M || allowLegacy)
+        }
 
-        fun getInstance(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                // Retrieve or generate an encrypted DB passphrase stored encrypted by keystore.
-                // Only enable encrypted DB when the platform keystore is usable; otherwise
-                // fall back to plaintext Room to avoid persisting raw keys insecurely.
-                val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
-                val encPass = prefs.getString("db_pass_enc", null)
-                var passphraseBytes: ByteArray? = null
-                // Only enable SQLCipher by default on devices API >= M (23).
-                // For pre-M devices, using wrapped keys is less secure; do not enable by default.
-                // Only enable SQLCipher by default on devices API >= M (23).
-                // Allow override if the user explicitly opted into legacy wrapped-key encryption.
-                val shared = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
-                val allowLegacy = shared.getBoolean("allow_legacy_wrapped_encryption", false)
-                val keystoreOk = EncryptionUtil.isKeystoreUsable(context) && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M || allowLegacy)
-                if (keystoreOk) {
-                    if (encPass != null) {
-                        passphraseBytes = try {
-                            EncryptionUtil.decryptAndDecodeBase64(context, encPass)
-                        } catch (_: Exception) {
-                            null
+        private fun loadOrCreatePassphraseForKeystore(context: Context): ByteArray? {
+            val prefs = context.getSharedPreferences("t1d_crypto", Context.MODE_PRIVATE)
+            val encPass = prefs.getString("db_pass_enc", null)
+            var passphraseBytes: ByteArray? = null
+            if (encPass != null) {
+                passphraseBytes = EncryptionUtil.decryptAndDecodeBase64(context, encPass)
+            }
+            if (passphraseBytes == null) {
+                // Delegate to existing helper that generates and persists a passphrase
+                passphraseBytes = persistNewPassphrase(context)
+            }
+            return passphraseBytes
+        }
+
+        private fun buildAppDatabase(context: Context, passphraseBytes: ByteArray?): AppDatabase {
+            val dbFile = context.getDatabasePath("t1d_db")
+            var instance: AppDatabase? = null
+
+            if (dbFile.exists() && isPlainSqlite(dbFile)) {
+                instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "t1d_db"
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+            } else {
+                if (passphraseBytes != null) {
+                    try {
+                        SQLiteDatabase.loadLibs(context)
+                        val supportFactory = SupportFactory(passphraseBytes)
+                        val builder = Room.databaseBuilder(
+                            context.applicationContext,
+                            AppDatabase::class.java,
+                            "t1d_db"
+                        )
+                        builder.openHelperFactory(supportFactory)
+                        builder.addMigrations(MIGRATION_1_2)
+                        instance = builder.build()
+                        try {
+                            passphraseBytes.fill(0)
+                        } catch (t: Throwable) {
+                            AppLog.w("AppDatabase", "Failed to zero passphraseBytes: ${t.message}")
                         }
+                    } catch (e: UnsatisfiedLinkError) {
+                        AppLog.w("AppDatabase", "SQLCipher libs failed to load: ${e.message}")
+                    } catch (e: SecurityException) {
+                        AppLog.w("AppDatabase", "Security exception while initializing SQLCipher: ${e.message}")
                     }
-                    if (passphraseBytes == null) {
-                        // Generate a 32-byte random passphrase and persist its Base64-encrypted form
-                        val bytes = ByteArray(32)
-                        SecureRandom().nextBytes(bytes)
-                        val passphraseBase64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                        val enc = EncryptionUtil.encryptString(context, passphraseBase64)
-                        prefs.edit { putString("db_pass_enc", enc) }
-                        passphraseBytes = bytes
-                    }
-                } else {
-                    AppLog.w("AppDatabase", "Keystore not usable; opening plaintext DB")
                 }
 
-                val instance: AppDatabase = try {
-                    // If a plain SQLite DB already exists, use normal Room with migrations
-                    val dbFile = context.getDatabasePath("t1d_db")
-                    fun isPlainSqlite(f: File): Boolean {
-                        return try {
-                            if (!f.exists() || f.length() < 16) return false
-                            FileInputStream(f).use { fis ->
-                                val header = ByteArray(16)
-                                val read = fis.read(header)
-                                if (read < 16) return false
-                                String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
-                            }
-                        } catch (_: Exception) {
-                            false
-                        }
-                    }
-
-                    if (dbFile.exists() && isPlainSqlite(dbFile)) {
-                        // Existing DB is plaintext SQLite; use normal Room with migrations
-                        Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "t1d_db")
-                            .addMigrations(MIGRATION_1_2)
-                            .build()
-                    } else {
-                        // If we have a passphrase (keystore usable), open encrypted DB; otherwise
-                        // fall back to plaintext Room with migrations.
-                        if (passphraseBytes != null) {
-                            try {
-                                // Initialize SQLCipher native libs and open encrypted DB
-                                SQLiteDatabase.loadLibs(context)
-                                val supportFactory = SupportFactory(passphraseBytes)
-                                try { passphraseBytes.fill(0) } catch (_: Exception) { }
-                                val builder = Room.databaseBuilder(
-                                    context.applicationContext,
-                                    AppDatabase::class.java,
-                                    "t1d_db"
-                                )
-                                builder.openHelperFactory(supportFactory)
-                                builder.addMigrations(MIGRATION_1_2).build()
-                            } catch (_: Exception) {
-                                // Failed to initialize SQLCipher; fall back to plaintext
-                                Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "t1d_db")
-                                    .addMigrations(MIGRATION_1_2)
-                                    .build()
-                            }
-                        } else {
-                            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "t1d_db")
-                                .addMigrations(MIGRATION_1_2)
-                                .build()
-                        }
-                    }
-                } catch (_: Exception) {
-                    // Any error: fallback to plain Room with migrations
-                    Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "t1d_db")
+                if (instance == null) {
+                    instance = Room.databaseBuilder(
+                        context.applicationContext,
+                        AppDatabase::class.java,
+                        "t1d_db"
+                    )
                         .addMigrations(MIGRATION_1_2)
                         .build()
                 }
+            }
 
+            return instance
+        }
+
+        fun getInstance(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val passphraseBytes = if (keystoreEnabled(context)) {
+                    loadOrCreatePassphraseForKeystore(context)
+                } else {
+                    AppLog.w("AppDatabase", "Keystore not usable; opening plaintext DB")
+                    null
+                }
+
+                val instance = buildAppDatabase(context, passphraseBytes)
                 INSTANCE = instance
                 instance
             }

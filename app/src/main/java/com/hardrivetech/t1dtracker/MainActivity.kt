@@ -5,17 +5,35 @@ import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
+import androidx.compose.material.Button
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Scaffold
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -148,9 +166,21 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
     val defaultISF by prefs.defaultISF.collectAsState(initial = 0.0)
     val defaultTarget by prefs.defaultTarget.collectAsState(initial = 0.0)
 
-    LaunchedEffect(defaultICR) { if (icrText.isEmpty() && defaultICR > 0.0) icrText = defaultICR.toString() }
-    LaunchedEffect(defaultISF) { if (isfText.isEmpty() && defaultISF > 0.0) isfText = defaultISF.toString() }
-    LaunchedEffect(defaultTarget) { if (targetText.isEmpty() && defaultTarget > 0.0) targetText = defaultTarget.toString() }
+    LaunchedEffect(defaultICR) {
+        if (icrText.isEmpty() && defaultICR > 0.0) {
+            icrText = defaultICR.toString()
+        }
+    }
+    LaunchedEffect(defaultISF) {
+        if (isfText.isEmpty() && defaultISF > 0.0) {
+            isfText = defaultISF.toString()
+        }
+    }
+    LaunchedEffect(defaultTarget) {
+        if (targetText.isEmpty() && defaultTarget > 0.0) {
+            targetText = defaultTarget.toString()
+        }
+    }
 
     val carbs = carbsText.toDoubleOrNull() ?: 0.0
     val icrEntered = icrText.toDoubleOrNull() ?: 0.0
@@ -162,7 +192,11 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
     val rounding = roundingText.toDoubleOrNull() ?: 0.5
 
     val carbDose = if (icr > 0) carbs / icr else 0.0
-    val correctionDose = if (isf > 0 && currentGlucose > targetGlucose) (currentGlucose - targetGlucose) / isf else 0.0
+    val correctionDose = if (isf > 0 && currentGlucose > targetGlucose) {
+        (currentGlucose - targetGlucose) / isf
+    } else {
+        0.0
+    }
     val totalDoseRaw = carbDose + correctionDose
     val totalDose = (kotlin.math.round(totalDoseRaw / rounding) * rounding)
 
@@ -190,7 +224,10 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
         Spacer(modifier = Modifier.height(16.dp))
         Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(carbDose)} U")
         Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(correctionDose)} U")
-        Text("Total dose (rounded ${rounding}U): ${formatDose(totalDose)} U", style = MaterialTheme.typography.h6)
+        Text(
+            "Total dose (rounded ${rounding}U): ${formatDose(totalDose)} U",
+            style = MaterialTheme.typography.h6
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {

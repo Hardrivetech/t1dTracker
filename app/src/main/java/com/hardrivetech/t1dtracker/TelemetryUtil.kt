@@ -50,7 +50,8 @@ object TelemetryUtil {
     }
 
     fun recordException(t: Throwable, message: String? = null) {
-        val sanitizedMsg = PrivacyUtil.redactPII(message ?: t.message ?: t.toString()) ?: (message ?: t::class.java.name)
+        val candidate = message ?: t.message ?: t.toString()
+        val sanitizedMsg = PrivacyUtil.redactPII(candidate) ?: (message ?: t::class.java.name)
         if (!telemetryEnabled) {
             AppLog.e("TelemetryUtil", "Telemetry disabled; exception: $sanitizedMsg", t)
             return

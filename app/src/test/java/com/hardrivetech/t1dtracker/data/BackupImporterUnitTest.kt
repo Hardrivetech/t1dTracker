@@ -33,8 +33,32 @@ class BackupImporterUnitTest {
     @Test
     fun importEncryptedBackupFile_insertsEntries() = runBlocking {
         val entries = listOf(
-            InsulinEntry(id = 0L, timestamp = System.currentTimeMillis(), carbs = 45.0, icr = 10.0, currentGlucose = 140.0, targetGlucose = 100.0, isf = 50.0, carbDose = 4.5, correctionDose = 0.8, totalDose = 5.3, notes = "note"),
-            InsulinEntry(id = 0L, timestamp = System.currentTimeMillis() + 1, carbs = 20.0, icr = 12.0, currentGlucose = 120.0, targetGlucose = 100.0, isf = 50.0, carbDose = 1.7, correctionDose = 0.4, totalDose = 2.1, notes = null)
+            InsulinEntry(
+                id = 0L,
+                timestamp = System.currentTimeMillis(),
+                carbs = 45.0,
+                icr = 10.0,
+                currentGlucose = 140.0,
+                targetGlucose = 100.0,
+                isf = 50.0,
+                carbDose = 4.5,
+                correctionDose = 0.8,
+                totalDose = 5.3,
+                notes = "note"
+            ),
+            InsulinEntry(
+                id = 0L,
+                timestamp = System.currentTimeMillis() + 1,
+                carbs = 20.0,
+                icr = 12.0,
+                currentGlucose = 120.0,
+                targetGlucose = 100.0,
+                isf = 50.0,
+                carbDose = 1.7,
+                correctionDose = 0.4,
+                totalDose = 2.1,
+                notes = null
+            )
         )
 
         val json = BackupUtil.buildJsonBackup(entries)

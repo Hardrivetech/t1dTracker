@@ -8,7 +8,7 @@ import com.hardrivetech.t1dtracker.data.InsulinEntry
 import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
-import org.junit.Assert.*
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -27,26 +27,36 @@ class SqlCipherMigrationCopyTest {
         val plainDb = android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(plainFile, null)
         plainDb.execSQL(
             """
-            CREATE TABLE IF NOT EXISTS insulin_entries (
-              id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-              timestamp INTEGER NOT NULL,
-              carbs REAL NOT NULL,
-              icr REAL NOT NULL,
-              currentGlucose REAL NOT NULL,
-              targetGlucose REAL NOT NULL,
-              isf REAL NOT NULL,
-              carbDose REAL NOT NULL,
-              correctionDose REAL NOT NULL,
-              totalDose REAL NOT NULL
-            )
+                        CREATE TABLE IF NOT EXISTS insulin_entries (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            timestamp INTEGER NOT NULL,
+                            carbs REAL NOT NULL,
+                            icr REAL NOT NULL,
+                            currentGlucose REAL NOT NULL,
+                            targetGlucose REAL NOT NULL,
+                            isf REAL NOT NULL,
+                            carbDose REAL NOT NULL,
+                            correctionDose REAL NOT NULL,
+                            totalDose REAL NOT NULL
+                        )
             """.trimIndent()
         )
+
         plainDb.execSQL(
-            "INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (3333333333, 25.0, 10.0, 130.0, 100.0, 50.0, 2.5, 0.6, 3.1)"
+            """
+                        INSERT INTO insulin_entries (
+                            timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose
+                        ) VALUES (
+                            3333333333, 25.0, 10.0, 130.0, 100.0, 50.0, 2.5, 0.6, 3.1
+                        )
+            """.trimIndent()
         )
 
         val cursor = plainDb.rawQuery(
-            "SELECT timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose FROM insulin_entries",
+            """
+            SELECT timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose
+            FROM insulin_entries
+            """.trimIndent(),
             null
         )
         val rows = mutableListOf<InsulinEntry>()

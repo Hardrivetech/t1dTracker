@@ -6,7 +6,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,7 +46,13 @@ class RoomMigrationTest {
                 """.trimIndent()
             )
             execSQL(
-                "INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (1234567890, 50.0, 10.0, 140.0, 100.0, 50.0, 5.0, 0.8, 5.8)"
+                """
+                                INSERT INTO insulin_entries (
+                                    timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose
+                                ) VALUES (
+                                    1234567890, 50.0, 10.0, 140.0, 100.0, 50.0, 5.0, 0.8, 5.8
+                                )
+                """.trimIndent()
             )
             close()
         }

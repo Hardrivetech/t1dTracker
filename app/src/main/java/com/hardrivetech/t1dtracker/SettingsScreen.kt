@@ -4,12 +4,34 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.LinearProgressIndicator
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.Switch
+import androidx.compose.material.Text
+import androidx.compose.material.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -145,9 +167,18 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                 .padding(16.dp)
                 .fillMaxSize()
         ) {
-            NumberField(stringResource(R.string.default_icr_label), icrDefaultText) { icrDefaultText = it }
-            NumberField(stringResource(R.string.default_isf_label), isfDefaultText) { isfDefaultText = it }
-            NumberField(label = stringResource(R.string.default_target_label), value = targetDefaultText) { targetDefaultText = it }
+            NumberField(
+                stringResource(R.string.default_icr_label),
+                icrDefaultText
+            ) { icrDefaultText = it }
+            NumberField(
+                stringResource(R.string.default_isf_label),
+                isfDefaultText
+            ) { isfDefaultText = it }
+            NumberField(
+                label = stringResource(R.string.default_target_label),
+                value = targetDefaultText
+            ) { targetDefaultText = it }
             Spacer(modifier = Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.allow_telemetry), modifier = Modifier.weight(1f))
@@ -230,16 +261,20 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
             }
 
             if (showLegacyConfirm) {
-                AlertDialog(onDismissRequest = { showLegacyConfirm = false }, title = {
-                    Text(
-                        stringResource(R.string.allow_legacy_encryption_warning_title)
-                    )
-                }, text = { Text(stringResource(R.string.allow_legacy_encryption_warning_text)) }, confirmButton = {
+                AlertDialog(
+                    onDismissRequest = { showLegacyConfirm = false },
+                    title = { Text(stringResource(R.string.allow_legacy_encryption_warning_title)) },
+                    text = { Text(stringResource(R.string.allow_legacy_encryption_warning_text)) },
+                    confirmButton = {
                         TextButton(onClick = {
                             sharedPrefs.edit().putBoolean("allow_legacy_wrapped_encryption", true).apply()
                             allowLegacyPref = true
                             showLegacyConfirm = false
-                            val ok = try { EncryptionUtil.isKeystoreUsable(context) } catch (_: Exception) { false }
+                            val ok = try {
+                                EncryptionUtil.isKeystoreUsable(context)
+                            } catch (_: Exception) {
+                                false
+                            }
                             if (ok) {
                                 Toast.makeText(
                                     context,
@@ -254,13 +289,13 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                                 ).show()
                             }
                         }) { Text(stringResource(R.string.proceed)) }
-                    }, dismissButton = {
+                    },
+                    dismissButton = {
                         TextButton(onClick = { showLegacyConfirm = false }) {
-                            Text(
-                                stringResource(R.string.cancel)
-                            )
+                            Text(stringResource(R.string.cancel))
                         }
-                    })
+                    }
+                )
             }
 
             OutlinedTextField(
@@ -319,12 +354,19 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(
-                                    Intent.createChooser(share, context.getString(R.string.share_backup))
+                                    Intent.createChooser(
+                                        share,
+                                        context.getString(R.string.share_backup)
+                                    )
                                 )
                             } catch (e: Exception) {
                                 AppLog.e("SettingsScreen", "Share failed: ${e.message}", e)
                                 TelemetryUtil.recordException(e, "Share backup failed")
-                                Toast.makeText(context, context.getString(R.string.share_failed), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.share_failed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         } else {
                             Toast.makeText(
@@ -413,38 +455,48 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                 }
 
                 if (migrationInProgress) {
-                    AlertDialog(onDismissRequest = {}, title = { Text(stringResource(R.string.migrating_title)) }, text = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(stringResource(R.string.migrating_text))
-                        }
-                    }, confirmButton = {})
+                    AlertDialog(
+                        onDismissRequest = {},
+                        title = { Text(stringResource(R.string.migrating_title)) },
+                        text = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(stringResource(R.string.migrating_text))
+                            }
+                        },
+                        confirmButton = {}
+                    )
                 }
 
-                Button(modifier = Modifier.fillMaxWidth(), enabled = !migrationInProgress && !restoreInProgress, onClick = {
-                    scope.launch {
-                        val backups = withContext(Dispatchers.IO) { listMigrationBackups(context) }
-                        availableBackups = backups
-                        if (availableBackups.isEmpty()) {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.no_migration_backups),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else {
-                            selectedRestoreTimestamp = availableBackups.first()
-                            showRestoreConfirm = true
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !migrationInProgress && !restoreInProgress,
+                    onClick = {
+                        scope.launch {
+                            val backups = withContext(Dispatchers.IO) { listMigrationBackups(context) }
+                            availableBackups = backups
+                            if (availableBackups.isEmpty()) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.no_migration_backups),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                selectedRestoreTimestamp = availableBackups.first()
+                                showRestoreConfirm = true
+                            }
                         }
                     }
-                }) { Text(stringResource(R.string.restore_pre_migration)) }
+                ) {
+                    Text(stringResource(R.string.restore_pre_migration))
+                }
 
                 if (showRestoreConfirm) {
-                    AlertDialog(onDismissRequest = { if (!restoreInProgress) showRestoreConfirm = false }, title = {
-                        Text(
-                            stringResource(R.string.restore_pre_migration)
-                        )
-                    }, text = {
+                    AlertDialog(
+                        onDismissRequest = { if (!restoreInProgress) showRestoreConfirm = false },
+                        title = { Text(stringResource(R.string.restore_pre_migration)) },
+                        text = {
                             Column {
                                 val ts = selectedRestoreTimestamp
                                 if (ts != null) {
@@ -452,12 +504,18 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                                         "yyyy-MM-dd HH:mm:ss",
                                         java.util.Locale.getDefault()
                                     )
-                                    Text(stringResource(R.string.restore_backup_question, sdf.format(java.util.Date(ts))))
+                                    Text(
+                                        stringResource(
+                                            R.string.restore_backup_question,
+                                            sdf.format(java.util.Date(ts))
+                                        )
+                                    )
                                 } else {
                                     Text(stringResource(R.string.restore_latest_question))
                                 }
                             }
-                        }, confirmButton = {
+                        },
+                        confirmButton = {
                             Row {
                                 TextButton(onClick = {
                                     showRestoreConfirm = false
@@ -482,35 +540,39 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                                 }) { Text(stringResource(R.string.restore_button)) }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 TextButton(onClick = { if (!restoreInProgress) showRestoreConfirm = false }) {
-                                    Text(
-                                        stringResource(R.string.cancel)
-                                    )
+                                    Text(stringResource(R.string.cancel))
                                 }
                             }
-                        }, dismissButton = {
+                        },
+                        dismissButton = {
                             TextButton(onClick = { if (!restoreInProgress) showRestoreConfirm = false }) {
-                                Text(
-                                    stringResource(R.string.cancel)
-                                )
+                                Text(stringResource(R.string.cancel))
                             }
-                        })
+                        }
+                    )
                 }
 
                 if (restoreInProgress) {
-                    AlertDialog(onDismissRequest = {}, title = { Text(stringResource(R.string.migrating_title)) }, text = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(stringResource(R.string.migrating_text))
-                        }
-                    }, confirmButton = {})
+                    AlertDialog(
+                        onDismissRequest = {},
+                        title = { Text(stringResource(R.string.migrating_title)) },
+                        text = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(stringResource(R.string.migrating_text))
+                            }
+                        },
+                        confirmButton = {}
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(modifier = Modifier.fillMaxWidth(), onClick = { openDocumentLauncher.launch(arrayOf("*/*")) }) {
-                    Text(
-                        stringResource(R.string.import_backup)
-                    )
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { openDocumentLauncher.launch(arrayOf("*/*")) }
+                ) {
+                    Text(stringResource(R.string.import_backup))
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
@@ -523,40 +585,60 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
     }
 
     if (showPrivacy) {
-        AlertDialog(onDismissRequest = { showPrivacy = false }, title = {
-            Text(
-                stringResource(R.string.privacy_policy_title)
-            )
-        }, text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
+        AlertDialog(
+            onDismissRequest = { showPrivacy = false },
+            title = {
+                Text(stringResource(R.string.privacy_policy_title))
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(8.dp)
+                ) {
                     Text("Data storage:")
-                    Text(
-                        "- All health data (entries, doses) is stored locally on your device using encrypted prefs and Room database. Backups you create are encrypted with a password you provide."
-                    )
+                    val dataStorageMsg = (
+                        "- All health data (entries, doses) is stored locally on your device " +
+                            "using encrypted prefs and Room database. " +
+                            "Backups you create are encrypted with a password you provide."
+                        )
+                    Text(dataStorageMsg)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Telemetry:")
-                    Text(
-                        "- Crash and usage telemetry is disabled by default. Enabling 'Allow telemetry' permits anonymous crash and analytics collection to help improve the app. No health data is sent in telemetry."
-                    )
+                    val telemetryMsg = (
+                        "- Crash and usage telemetry is disabled by default. Enabling 'Allow telemetry' " +
+                            "permits anonymous crash and analytics collection to help improve the app. " +
+                            "No health data is sent in telemetry."
+                        )
+                    Text(telemetryMsg)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Backups & sharing:")
-                    Text(
-                        "- Backups are encrypted with PBKDF2-derived AES-GCM using the password you supply. Keep the password safe; it cannot be recovered by the app."
-                    )
+                    val backupsMsg = (
+                        "- Backups are encrypted with PBKDF2-derived AES-GCM using the password you supply. " +
+                            "Keep the password safe; it cannot be recovered by the app."
+                        )
+                    Text(backupsMsg)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Requests & contact:")
                     Text("- To request data deletion or help, contact: hardrivetech@proton.me")
                 }
-            }, confirmButton = { TextButton(onClick = { showPrivacy = false }) { Text(stringResource(R.string.close)) } })
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrivacy = false }) { Text(stringResource(R.string.close)) }
+            }
+        )
     }
 
     if (showRecoveryGuidance) {
-        AlertDialog(onDismissRequest = { showRecoveryGuidance = false }, title = {
-            Text(
-                stringResource(R.string.backup_recommendations_title)
-            )
-        }, text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
+        AlertDialog(
+            onDismissRequest = { showRecoveryGuidance = false },
+            title = { Text(stringResource(R.string.backup_recommendations_title)) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(8.dp)
+                ) {
                     Text(stringResource(R.string.backup_rec_1))
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(stringResource(R.string.backup_rec_2))
@@ -566,13 +648,13 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                     Text(stringResource(R.string.restore_notes_1))
                     Text(stringResource(R.string.restore_notes_2))
                 }
-            }, confirmButton = {
+            },
+            confirmButton = {
                 TextButton(onClick = { showRecoveryGuidance = false }) {
-                    Text(
-                        stringResource(R.string.close)
-                    )
+                    Text(stringResource(R.string.close))
                 }
-            })
+            }
+        )
     }
 
     if (showRotateConfirm) {
@@ -585,12 +667,20 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
                     showRotateConfirm = false
                     scope.launch {
                         rotatingKeyInProgress = true
-                        val ok = try { withContext(Dispatchers.IO) { EncryptionUtil.rotateKey(context) } } catch (
-                            e: Exception
-                        ) { false }
+                        val ok = try {
+                            withContext(Dispatchers.IO) {
+                                EncryptionUtil.rotateKey(context)
+                            }
+                        } catch (e: Exception) {
+                            false
+                        }
                         rotatingKeyInProgress = false
                         if (ok) {
-                            Toast.makeText(context, context.getString(R.string.rotate_key_success), Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.rotate_key_success),
+                                Toast.LENGTH_LONG
+                            ).show()
                         } else {
                             Toast.makeText(
                                 context,

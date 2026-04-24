@@ -46,7 +46,11 @@ object BackupUtil {
         return root.toString()
     }
 
-    fun encryptBackupWithPassword(password: CharArray, plaintext: ByteArray, iterations: Int = PBKDF2_ITERATIONS): String {
+    fun encryptBackupWithPassword(
+        password: CharArray,
+        plaintext: ByteArray,
+        iterations: Int = PBKDF2_ITERATIONS
+    ): String {
         val salt = ByteArray(SALT_SIZE)
         SecureRandom().nextBytes(salt)
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
@@ -65,20 +69,29 @@ object BackupUtil {
 
                 val cipherBytes = cipher.doFinal(plaintext)
 
-                // Format: MAGIC(4) | iterations(4 big-endian) | salt | iv | ciphertext
+                // Format: MAGIC(4) | iterations(4 big-endian) |
+                // salt | iv | ciphertext
                 val iterBytes = byteArrayOf(
                     ((iterations ushr 24) and 0xFF).toByte(),
                     ((iterations ushr 16) and 0xFF).toByte(),
                     ((iterations ushr 8) and 0xFF).toByte(),
                     (iterations and 0xFF).toByte()
                 )
-
-                val combined = ByteArray(MAGIC.size + iterBytes.size + salt.size + iv.size + cipherBytes.size)
+                val combinedSize = MAGIC.size +
+                    iterBytes.size +
+                    salt.size +
+                    iv.size +
+                    cipherBytes.size
+                val combined = ByteArray(combinedSize)
                 var offset = 0
-                System.arraycopy(MAGIC, 0, combined, offset, MAGIC.size); offset += MAGIC.size
-                System.arraycopy(iterBytes, 0, combined, offset, iterBytes.size); offset += iterBytes.size
-                System.arraycopy(salt, 0, combined, offset, salt.size); offset += salt.size
-                System.arraycopy(iv, 0, combined, offset, iv.size); offset += iv.size
+                System.arraycopy(MAGIC, 0, combined, offset, MAGIC.size)
+                offset += MAGIC.size
+                System.arraycopy(iterBytes, 0, combined, offset, iterBytes.size)
+                offset += iterBytes.size
+                System.arraycopy(salt, 0, combined, offset, salt.size)
+                offset += salt.size
+                System.arraycopy(iv, 0, combined, offset, iv.size)
+                offset += iv.size
                 System.arraycopy(cipherBytes, 0, combined, offset, cipherBytes.size)
 
                 val out = Base64.encodeToString(combined, Base64.NO_WRAP)
@@ -96,7 +109,11 @@ object BackupUtil {
         }
     }
 
-    fun decryptBackupWithPassword(password: CharArray, combinedB64: String, iterationsDefault: Int = PBKDF2_ITERATIONS): ByteArray? {
+    fun decryptBackupWithPassword(
+        password: CharArray,
+        combinedB64: String,
+        iterationsDefault: Int = PBKDF2_ITERATIONS
+    ): ByteArray? {
         return try {
             val combined = Base64.decode(combinedB64, Base64.NO_WRAP)
             if (combined.size < SALT_SIZE + IV_SIZE) return null
@@ -108,7 +125,9 @@ object BackupUtil {
             val cipherBytes: ByteArray
 
             // Check for new format with MAGIC prefix
-            if (combined.size >= MAGIC.size && combined.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) {
+            val hasMagic = combined.size >= MAGIC.size &&
+                combined.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)
+            if (hasMagic) {
                 offset += MAGIC.size
                 if (combined.size < offset + 4 + SALT_SIZE + IV_SIZE) return null
                 val iterBytes = combined.copyOfRange(offset, offset + 4); offset += 4
@@ -160,12 +179,19 @@ object BackupUtil {
      * The file content is the Base64-encoded (salt|iv|ciphertext) blob so it can be
      * easily shared via FileProvider.
      */
-    fun createEncryptedBackupFile(context: Context, filename: String, entries: List<InsulinEntry>, password: CharArray): File? {
+    fun createEncryptedBackupFile(
+        context: Context,
+        filename: String,
+        entries: List<InsulinEntry>,
+        password: CharArray
+    ): File? {
         try {
             val json = buildJsonBackup(entries)
             val encrypted = encryptBackupWithPassword(password, json.toByteArray(Charsets.UTF_8))
             val outFile = File(context.cacheDir, filename)
-            FileOutputStream(outFile).use { it.write(encrypted.toByteArray(Charsets.UTF_8)) }
+            FileOutputStream(outFile).use { stream ->
+                stream.write(encrypted.toByteArray(Charsets.UTF_8))
+            }
             return outFile
         } catch (_: Exception) {
             return null

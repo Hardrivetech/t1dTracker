@@ -5,7 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.hardrivetech.t1dtracker.data.AppDatabase
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.*
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -40,7 +40,13 @@ class AppDatabasePlainDetectionTest {
         )
         // Insert a row we can identify
         sqlite.execSQL(
-            "INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (2222222222, 12.5, 10.0, 110.0, 100.0, 50.0, 1.25, 0.2, 1.45)"
+            """
+                        INSERT INTO insulin_entries (
+                            timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose
+                        ) VALUES (
+                            2222222222, 12.5, 10.0, 110.0, 100.0, 50.0, 1.25, 0.2, 1.45
+                        )
+            """.trimIndent()
         )
         sqlite.close()
 
