@@ -113,7 +113,7 @@ Or assemble an APK for quick testing:
 
 ## Contact
 
-Support/contact: hardrivetech@proton.me (replace for production).
+Support/contact: hardrivetech@proton.me.
 # t1dTracker (Android)
 
 Minimal Android app scaffold (Kotlin + Jetpack Compose) with a simple insulin calculator.
