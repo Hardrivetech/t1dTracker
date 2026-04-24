@@ -49,6 +49,20 @@ jobs:
         env:
           JAVA_HOME: ${{ runner.java_home }}
 
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/test-results
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
   instrumented:
     needs: build
     runs-on: ubuntu-latest
@@ -77,3 +91,10 @@ jobs:
         run: ./gradlew -Pci --no-daemon connectedDebugAndroidTest
         env:
           JAVA_HOME: ${{ runner.java_home }}
+
+      - name: Upload instrumentation test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumentation-test-reports
+          path: app/build/reports/androidTests
