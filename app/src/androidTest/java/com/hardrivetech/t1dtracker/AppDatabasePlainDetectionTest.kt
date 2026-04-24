@@ -1,13 +1,13 @@
 package com.hardrivetech.t1dtracker
 
+import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.hardrivetech.t1dtracker.data.AppDatabase
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import android.database.sqlite.SQLiteDatabase
-import kotlinx.coroutines.runBlocking
-import com.hardrivetech.t1dtracker.data.AppDatabase
 
 @RunWith(AndroidJUnit4::class)
 class AppDatabasePlainDetectionTest {
@@ -39,7 +39,9 @@ class AppDatabasePlainDetectionTest {
             """.trimIndent()
         )
         // Insert a row we can identify
-        sqlite.execSQL("INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (2222222222, 12.5, 10.0, 110.0, 100.0, 50.0, 1.25, 0.2, 1.45)")
+        sqlite.execSQL(
+            "INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (2222222222, 12.5, 10.0, 110.0, 100.0, 50.0, 1.25, 0.2, 1.45)"
+        )
         sqlite.close()
 
         // Now get the AppDatabase instance; it should detect plain sqlite and open Room normally

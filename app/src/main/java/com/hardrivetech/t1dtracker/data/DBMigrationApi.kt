@@ -3,9 +3,9 @@ package com.hardrivetech.t1dtracker.data
 import android.content.Context
 import com.hardrivetech.t1dtracker.AppLog
 import com.hardrivetech.t1dtracker.TelemetryUtil
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Migration backup helpers (list + restore) moved out of `AppDatabase`'s
@@ -57,7 +57,13 @@ suspend fun restoreMigrationBackup(context: Context, timestamp: Long): Boolean =
             for (name in expectedNames) {
                 val bak = File(backupDir, "$name.$timestamp.bak")
                 if (bak.exists()) {
-                    val dst = if (name == dbFile.name) dbFile else File(dbFile.absolutePath + name.substringAfter(dbFile.name))
+                    val dst = if (name == dbFile.name) {
+                        dbFile
+                    } else {
+                        File(
+                            dbFile.absolutePath + name.substringAfter(dbFile.name)
+                        )
+                    }
                     dst.parentFile?.mkdirs()
                     bak.copyTo(dst, overwrite = true)
                 }

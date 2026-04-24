@@ -1,49 +1,35 @@
 package com.hardrivetech.t1dtracker
 
-import android.os.Bundle
 import android.app.Activity
-import android.widget.Toast
 import android.graphics.Color as AndroidColor
-import androidx.fragment.app.FragmentActivity
-import androidx.core.view.WindowCompat
+import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.runtime.*
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
-import android.content.Intent
-import androidx.core.content.FileProvider
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.File
-import com.hardrivetech.t1dtracker.util.PasswordStrength
-import com.hardrivetech.t1dtracker.data.BackupUtil
-import com.hardrivetech.t1dtracker.data.BackupImporter
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.fragment.app.FragmentActivity
 import com.hardrivetech.t1dtracker.data.AppDatabase
 import com.hardrivetech.t1dtracker.data.InsulinEntry
 import com.hardrivetech.t1dtracker.data.PrefsRepository
-import com.hardrivetech.t1dtracker.data.listMigrationBackups
-import com.hardrivetech.t1dtracker.data.restoreMigrationBackup
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.luminance
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,7 +62,11 @@ fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
                 appScope.launch { prefs.setBiometricEnabled(false) }
             } else {
                 if (!BiometricAuth.isAvailable(appContext)) {
-                    Toast.makeText(appContext, appContext.getString(R.string.biometric_unavailable_disabling), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        appContext,
+                        appContext.getString(R.string.biometric_unavailable_disabling),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     appScope.launch { prefs.setBiometricEnabled(false) }
                 } else {
                     val ok = BiometricAuth.authenticate(activity, "Unlock t1dTracker", "Authenticate to continue")
@@ -120,15 +110,20 @@ fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
                             )
                         }
                         IconButton(onClick = { screen = "settings" }) {
-                            Icon(imageVector = Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_desc))
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.settings_desc)
+                            )
                         }
                     }
                 )
             }
         ) { padding ->
-            Surface(modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
                 when (screen) {
                     "calculator" -> InsulinCalculatorScreen(db, prefs)
                     "history" -> HistoryScreen(db)
@@ -178,9 +173,11 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
 
     LaunchedEffect(db) { entries = db.insulinDao().getAll() }
 
-    Column(modifier = Modifier
-        .verticalScroll(rememberScrollState())
-        .padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
         Spacer(modifier = Modifier.height(12.dp))
         NumberField(stringResource(R.string.carbs_label), carbsText) { carbsText = it }
         NumberField(stringResource(R.string.icr_label), icrText) { icrText = it }

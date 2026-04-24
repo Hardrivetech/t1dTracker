@@ -1,12 +1,12 @@
 package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
-import com.hardrivetech.t1dtracker.EncryptionUtil
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.hardrivetech.t1dtracker.EncryptionUtil
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -48,7 +48,7 @@ class PrefsRepository(private val context: Context) {
             enc?.toDoubleOrNull() ?: 0.0
         }
     }
-    
+
     val telemetryConsent: Flow<Boolean> = context.dataStore.data.map { prefs ->
         val enc = prefs[TELEMETRY_KEY]
         if (keystoreOk) {
@@ -58,7 +58,7 @@ class PrefsRepository(private val context: Context) {
             enc?.toBoolean() ?: false
         }
     }
-    
+
     private val BIOMETRIC_KEY = stringPreferencesKey("biometric_enabled")
     val biometricEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         val enc = prefs[BIOMETRIC_KEY]
@@ -97,12 +97,11 @@ class PrefsRepository(private val context: Context) {
             prefs[TELEMETRY_KEY] = toStore
         }
     }
-    
+
     suspend fun setBiometricEnabled(value: Boolean) {
         val toStore = if (keystoreOk) EncryptionUtil.encryptString(context, value.toString()) else value.toString()
         context.dataStore.edit { prefs ->
             prefs[BIOMETRIC_KEY] = toStore
         }
     }
-
 }

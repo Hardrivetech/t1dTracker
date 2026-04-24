@@ -22,7 +22,10 @@ object TelemetryUtil {
             val analyticsCls = Class.forName("com.google.firebase.analytics.FirebaseAnalytics")
             val getInstance = analyticsCls.getMethod("getInstance", Context::class.java)
             val analyticsInstance = getInstance.invoke(null, context)
-            val setEnabled = analyticsInstance.javaClass.getMethod("setAnalyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
+            val setEnabled = analyticsInstance.javaClass.getMethod(
+                "setAnalyticsCollectionEnabled",
+                Boolean::class.javaPrimitiveType
+            )
             setEnabled.invoke(analyticsInstance, enabled)
         } catch (t: Throwable) {
             AppLog.i("TelemetryUtil", "Firebase Analytics not available: ${t.message}")

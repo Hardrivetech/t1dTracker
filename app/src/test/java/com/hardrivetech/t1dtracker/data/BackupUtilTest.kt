@@ -1,8 +1,8 @@
 package com.hardrivetech.t1dtracker.data
 
+import java.nio.charset.StandardCharsets
 import org.junit.Assert.*
 import org.junit.Test
-import java.nio.charset.StandardCharsets
 
 class BackupUtilTest {
     @Test

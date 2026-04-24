@@ -3,23 +3,23 @@ package com.hardrivetech.t1dtracker.data
 import android.content.Context
 import android.os.Build
 import android.util.Base64
+import androidx.core.content.edit
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
-import net.sqlcipher.database.SupportFactory
-import net.sqlcipher.database.SQLiteDatabase
+import com.hardrivetech.t1dtracker.AppLog
 import com.hardrivetech.t1dtracker.EncryptionUtil
-import java.security.SecureRandom
+import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.File
 import java.io.FileInputStream
+import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.room.withTransaction
-import androidx.core.content.edit
-import com.hardrivetech.t1dtracker.AppLog
-import com.hardrivetech.t1dtracker.TelemetryUtil
+import net.sqlcipher.database.SQLiteDatabase
+import net.sqlcipher.database.SupportFactory
 
 @Database(entities = [InsulinEntry::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
@@ -28,7 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
-        
+
         // Migration from schema version 1 -> 2: add the optional `notes` column
         // to `insulin_entries`. This is non-destructive and will add a NULLabel
         // TEXT column for older databases.
@@ -53,7 +53,10 @@ abstract class AppDatabase : RoomDatabase() {
                     val allowLegacy = shared.getBoolean("allow_legacy_wrapped_encryption", false)
                     val keystoreAvailable = EncryptionUtil.isKeystoreUsable(context)
                     if (!keystoreAvailable || (Build.VERSION.SDK_INT < Build.VERSION_CODES.M && !allowLegacy)) {
-                        AppLog.w("AppDatabase", "Keystore not usable or device API < M (and legacy not allowed); cannot migrate to encrypted DB")
+                        AppLog.w(
+                            "AppDatabase",
+                            "Keystore not usable or device API < M (and legacy not allowed); cannot migrate to encrypted DB"
+                        )
                         return@withContext false
                     }
 
@@ -264,7 +267,11 @@ abstract class AppDatabase : RoomDatabase() {
                                 SQLiteDatabase.loadLibs(context)
                                 val supportFactory = SupportFactory(passphraseBytes)
                                 try { passphraseBytes.fill(0) } catch (_: Exception) { }
-                                val builder = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "t1d_db")
+                                val builder = Room.databaseBuilder(
+                                    context.applicationContext,
+                                    AppDatabase::class.java,
+                                    "t1d_db"
+                                )
                                 builder.openHelperFactory(supportFactory)
                                 builder.addMigrations(MIGRATION_1_2).build()
                             } catch (_: Exception) {

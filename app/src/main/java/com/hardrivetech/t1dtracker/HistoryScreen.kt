@@ -1,35 +1,40 @@
 package com.hardrivetech.t1dtracker
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Paint as AndroidPaint
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
-import androidx.core.content.FileProvider
-import java.io.File
-import androidx.compose.ui.Alignment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.Button
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.TextButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
-import kotlinx.coroutines.launch
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.Button
+import androidx.compose.material.Card
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -37,29 +42,23 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.material.Card
-import androidx.compose.foundation.layout.Box
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.graphics.Paint as AndroidPaint
-import java.text.SimpleDateFormat
-import java.util.Locale
-import android.content.ContentValues
-import android.os.Build
-import android.provider.MediaStore
-import android.os.Environment
-import java.io.IOException
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.hardrivetech.t1dtracker.data.AppDatabase
 import com.hardrivetech.t1dtracker.data.InsulinEntry
-
+import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun HistoryScreen(db: AppDatabase) {
@@ -125,10 +124,12 @@ fun HistoryScreen(db: AppDatabase) {
             Text("No entries for selected range.")
         } else {
             val points = filtered.map { it.timestamp to it.currentGlucose }
-            LineChart(points = points, modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp))
-            { idx ->
+            LineChart(
+                points = points,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) { idx ->
                 selectedEntry = filtered.getOrNull(idx)
                 showEntryDialog = selectedEntry != null
             }
@@ -139,12 +140,14 @@ fun HistoryScreen(db: AppDatabase) {
             Spacer(modifier = Modifier.height(8.dp))
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(filtered) { e ->
-                    Text("${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g — ${e.currentGlucose} mg/dL")
+                    Text(
+                        "${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g — ${e.currentGlucose} mg/dL"
+                    )
                 }
             }
         }
-        
-            if (showEntryDialog && selectedEntry != null) {
+
+        if (showEntryDialog && selectedEntry != null) {
             val e = selectedEntry!!
             AlertDialog(
                 onDismissRequest = { showEntryDialog = false; selectedEntry = null },
@@ -201,12 +204,41 @@ fun HistoryScreen(db: AppDatabase) {
                 title = { Text("Edit entry") },
                 text = {
                     Column {
-                        OutlinedTextField(value = editCarbsText, onValueChange = { editCarbsText = it }, label = { Text("Carbs (g)") }, keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number))
-                        OutlinedTextField(value = editIcrText, onValueChange = { editIcrText = it }, label = { Text("ICR (g per unit)") }, keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number))
-                        OutlinedTextField(value = editCurrentText, onValueChange = { editCurrentText = it }, label = { Text("Current glucose (mg/dL)") }, keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number))
-                        OutlinedTextField(value = editTargetText, onValueChange = { editTargetText = it }, label = { Text("Target glucose (mg/dL)") }, keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number))
-                        OutlinedTextField(value = editIsfText, onValueChange = { editIsfText = it }, label = { Text("ISF (mg/dL per unit)") }, keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number))
-                        OutlinedTextField(value = editNotesText, onValueChange = { editNotesText = it }, label = { Text("Notes") })
+                        OutlinedTextField(
+                            value = editCarbsText,
+                            onValueChange = { editCarbsText = it },
+                            label = { Text("Carbs (g)") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedTextField(
+                            value = editIcrText,
+                            onValueChange = { editIcrText = it },
+                            label = { Text("ICR (g per unit)") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedTextField(
+                            value = editCurrentText,
+                            onValueChange = { editCurrentText = it },
+                            label = { Text("Current glucose (mg/dL)") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedTextField(
+                            value = editTargetText,
+                            onValueChange = { editTargetText = it },
+                            label = { Text("Target glucose (mg/dL)") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedTextField(
+                            value = editIsfText,
+                            onValueChange = { editIsfText = it },
+                            label = { Text("ISF (mg/dL per unit)") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                        OutlinedTextField(
+                            value = editNotesText,
+                            onValueChange = { editNotesText = it },
+                            label = { Text("Notes") }
+                        )
                     }
                 },
                 confirmButton = {
@@ -261,7 +293,7 @@ fun HistoryScreen(db: AppDatabase) {
                         TextButton(onClick = {
                             // CSV as file
                             val csv = buildCsv(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.csv"
+                            val fileName = "t1dtracker_export_$now3.csv"
                             writeCacheAndShareFile(context, fileName, csv, "text/csv", "t1dTracker CSV export")
                             showExportDialog = false
                         }) { Text("CSV (file)") }
@@ -269,8 +301,14 @@ fun HistoryScreen(db: AppDatabase) {
                         TextButton(onClick = {
                             // CSV encrypted as file (device-keystore bound)
                             val csv = buildCsv(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.csv.enc"
-                            writeEncryptedCacheAndShareFile(context, fileName, csv, "application/octet-stream", "t1dTracker Encrypted CSV export")
+                            val fileName = "t1dtracker_export_$now3.csv.enc"
+                            writeEncryptedCacheAndShareFile(
+                                context,
+                                fileName,
+                                csv,
+                                "application/octet-stream",
+                                "t1dTracker Encrypted CSV export"
+                            )
                             showExportDialog = false
                         }) { Text("CSV Encrypted (file)") }
 
@@ -284,7 +322,7 @@ fun HistoryScreen(db: AppDatabase) {
                         TextButton(onClick = {
                             // HTML file
                             val html = buildHtml(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.html"
+                            val fileName = "t1dtracker_export_$now3.html"
                             writeCacheAndShareFile(context, fileName, html, "text/html", "t1dTracker HTML export")
                             showExportDialog = false
                         }) { Text("HTML (file)") }
@@ -299,18 +337,28 @@ fun HistoryScreen(db: AppDatabase) {
                         TextButton(onClick = {
                             // JSON file
                             val json = buildJson(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.json"
-                            writeCacheAndShareFile(context, fileName, json, "application/json", "t1dTracker JSON export")
+                            val fileName = "t1dtracker_export_$now3.json"
+                            writeCacheAndShareFile(
+                                context,
+                                fileName,
+                                json,
+                                "application/json",
+                                "t1dTracker JSON export"
+                            )
                             showExportDialog = false
                         }) { Text("JSON (file)") }
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             val csv = buildCsv(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.csv"
+                            val fileName = "t1dtracker_export_$now3.csv"
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 saveToDownloads(context, fileName, csv, "text/csv")
                             } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
                                     savePublicLegacy(context, fileName, csv)
                                 } else {
                                     pendingSave.value = Triple(fileName, csv, "text/csv")
@@ -323,12 +371,16 @@ fun HistoryScreen(db: AppDatabase) {
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             val csv = buildCsv(entriesToExport)
-                            val encName = "t1dtracker_export_${now3}.csv.enc"
+                            val encName = "t1dtracker_export_$now3.csv.enc"
                             val enc = EncryptionUtil.encryptString(context, csv)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 saveToDownloads(context, encName, enc, "application/octet-stream")
                             } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
                                     savePublicLegacy(context, encName, enc)
                                 } else {
                                     pendingSave.value = Triple(encName, enc, "application/octet-stream")
@@ -341,11 +393,15 @@ fun HistoryScreen(db: AppDatabase) {
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             val html = buildHtml(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.html"
+                            val fileName = "t1dtracker_export_$now3.html"
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 saveToDownloads(context, fileName, html, "text/html")
                             } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
                                     savePublicLegacy(context, fileName, html)
                                 } else {
                                     pendingSave.value = Triple(fileName, html, "text/html")
@@ -358,11 +414,15 @@ fun HistoryScreen(db: AppDatabase) {
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             val json = buildJson(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.json"
+                            val fileName = "t1dtracker_export_$now3.json"
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 saveToDownloads(context, fileName, json, "application/json")
                             } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
                                     savePublicLegacy(context, fileName, json)
                                 } else {
                                     pendingSave.value = Triple(fileName, json, "application/json")
@@ -375,11 +435,15 @@ fun HistoryScreen(db: AppDatabase) {
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             val txt = buildPlainText(entriesToExport)
-                            val fileName = "t1dtracker_export_${now3}.txt"
+                            val fileName = "t1dtracker_export_$now3.txt"
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 saveToDownloads(context, fileName, txt, "text/plain")
                             } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
                                     savePublicLegacy(context, fileName, txt)
                                 } else {
                                     pendingSave.value = Triple(fileName, txt, "text/plain")
@@ -399,7 +463,10 @@ fun HistoryScreen(db: AppDatabase) {
 }
 
 private fun escapeHtml(s: String): String {
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace(
+        "'",
+        "&#39;"
+    )
 }
 
 private fun buildHtml(entries: List<InsulinEntry>): String {
@@ -407,7 +474,9 @@ private fun buildHtml(entries: List<InsulinEntry>): String {
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     sb.append("<!doctype html><html><head><meta charset=\"utf-8\"><title>t1dTracker export</title></head><body>")
     sb.append("<h1>t1dTracker export</h1>")
-    sb.append("<table border=\"1\" cellpadding=\"4\"><tr><th>id</th><th>timestamp</th><th>datetime</th><th>carbs</th><th>icr</th><th>currentGlucose</th><th>targetGlucose</th><th>isf</th><th>carbDose</th><th>correctionDose</th><th>totalDose</th><th>notes</th></tr>")
+    sb.append(
+        "<table border=\"1\" cellpadding=\"4\"><tr><th>id</th><th>timestamp</th><th>datetime</th><th>carbs</th><th>icr</th><th>currentGlucose</th><th>targetGlucose</th><th>isf</th><th>carbDose</th><th>correctionDose</th><th>totalDose</th><th>notes</th></tr>"
+    )
     for (e in entries) {
         val date = sdf.format(java.util.Date(e.timestamp))
         val notesEscaped = escapeHtml(e.notes ?: "")
@@ -476,7 +545,13 @@ private fun buildPlainText(entries: List<InsulinEntry>): String {
     return sb.toString()
 }
 
-private fun writeCacheAndShareFile(context: Context, filename: String, content: String, mimeType: String, subject: String) {
+private fun writeCacheAndShareFile(
+    context: Context,
+    filename: String,
+    content: String,
+    mimeType: String,
+    subject: String
+) {
     try {
         val file = File(context.cacheDir, filename)
         file.writeText(content)
@@ -493,7 +568,13 @@ private fun writeCacheAndShareFile(context: Context, filename: String, content: 
     }
 }
 
-private fun writeEncryptedCacheAndShareFile(context: Context, filename: String, contentPlain: String, mimeType: String, subject: String) {
+private fun writeEncryptedCacheAndShareFile(
+    context: Context,
+    filename: String,
+    contentPlain: String,
+    mimeType: String,
+    subject: String
+) {
     try {
         val enc = EncryptionUtil.encryptString(context, contentPlain)
         val file = File(context.cacheDir, filename)
@@ -586,12 +667,16 @@ private fun savePublicLegacy(context: Context, filename: String, content: String
 
 private fun buildCsv(entries: List<InsulinEntry>): String {
     val sb = StringBuilder()
-    sb.append("id,timestamp,datetime,carbs,icr,currentGlucose,targetGlucose,isf,carbDose,correctionDose,totalDose,notes\n")
+    sb.append(
+        "id,timestamp,datetime,carbs,icr,currentGlucose,targetGlucose,isf,carbDose,correctionDose,totalDose,notes\n"
+    )
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     for (e in entries) {
         val date = sdf.format(java.util.Date(e.timestamp))
         val notesEscaped = e.notes?.replace("\"", "\"\"") ?: ""
-        sb.append("${e.id},${e.timestamp},\"${date}\",${e.carbs},${e.icr},${e.currentGlucose},${e.targetGlucose},${e.isf},${e.carbDose},${e.correctionDose},${e.totalDose},\"${notesEscaped}\"\n")
+        sb.append(
+            "${e.id},${e.timestamp},\"${date}\",${e.carbs},${e.icr},${e.currentGlucose},${e.targetGlucose},${e.isf},${e.carbDose},${e.correctionDose},${e.totalDose},\"${notesEscaped}\"\n"
+        )
     }
     return sb.toString()
 }
@@ -628,102 +713,105 @@ fun LineChart(
     var visibleXMin by remember { mutableStateOf(fullXMin) }
     var visibleXMax by remember { mutableStateOf(fullXMax) }
 
-    Box(modifier = modifier
-        .onSizeChanged { canvasSize = it }
-        .pointerInput(points) {
-            detectTransformGestures { centroid, pan, zoom, _ ->
-                if (canvasSize.width == 0 || canvasSize.height == 0) return@detectTransformGestures
-                val w = canvasSize.width.toFloat()
-                val chartWidth = w - leftPaddingPx - rightPaddingPx
-                if (chartWidth <= 0f) return@detectTransformGestures
+    Box(
+        modifier = modifier
+            .onSizeChanged { canvasSize = it }
+            .pointerInput(points) {
+                detectTransformGestures { centroid, pan, zoom, _ ->
+                    if (canvasSize.width == 0 || canvasSize.height == 0) return@detectTransformGestures
+                    val w = canvasSize.width.toFloat()
+                    val chartWidth = w - leftPaddingPx - rightPaddingPx
+                    if (chartWidth <= 0f) return@detectTransformGestures
 
-                val oldMin = visibleXMin.toDouble()
-                val oldMax = visibleXMax.toDouble()
-                val oldRange = oldMax - oldMin
-                if (oldRange <= 0) return@detectTransformGestures
+                    val oldMin = visibleXMin.toDouble()
+                    val oldMax = visibleXMax.toDouble()
+                    val oldRange = oldMax - oldMin
+                    if (oldRange <= 0) return@detectTransformGestures
 
-                val centerX = centroid.x.coerceIn(leftPaddingPx, leftPaddingPx + chartWidth)
-                val centerFrac = ((centerX - leftPaddingPx) / chartWidth).coerceIn(0f, 1f)
-                val centerTime = oldMin + centerFrac * oldRange
+                    val centerX = centroid.x.coerceIn(leftPaddingPx, leftPaddingPx + chartWidth)
+                    val centerFrac = ((centerX - leftPaddingPx) / chartWidth).coerceIn(0f, 1f)
+                    val centerTime = oldMin + centerFrac * oldRange
 
-                val newRange = (oldRange / zoom).coerceAtLeast(1.0)
-                var newMin = centerTime - (centerTime - oldMin) / zoom
-                var newMax = centerTime + (oldMax - centerTime) / zoom
+                    val newRange = (oldRange / zoom).coerceAtLeast(1.0)
+                    var newMin = centerTime - (centerTime - oldMin) / zoom
+                    var newMax = centerTime + (oldMax - centerTime) / zoom
 
-                // apply pan (pan.x positive means finger moved right -> move window left)
-                val timeDelta = (pan.x / chartWidth.toDouble()) * newRange
-                newMin -= timeDelta
-                newMax -= timeDelta
+                    // apply pan (pan.x positive means finger moved right -> move window left)
+                    val timeDelta = (pan.x / chartWidth.toDouble()) * newRange
+                    newMin -= timeDelta
+                    newMax -= timeDelta
 
-                // clamp to full data bounds
-                val fullMin = fullXMin.toDouble()
-                val fullMax = fullXMax.toDouble()
-                val visibleRange = newMax - newMin
-                if (visibleRange > (fullMax - fullMin)) {
-                    newMin = fullMin
-                    newMax = fullMax
-                } else {
-                    if (newMin < fullMin) {
-                        val shift = fullMin - newMin
-                        newMin += shift
-                        newMax += shift
+                    // clamp to full data bounds
+                    val fullMin = fullXMin.toDouble()
+                    val fullMax = fullXMax.toDouble()
+                    val visibleRange = newMax - newMin
+                    if (visibleRange > (fullMax - fullMin)) {
+                        newMin = fullMin
+                        newMax = fullMax
+                    } else {
+                        if (newMin < fullMin) {
+                            val shift = fullMin - newMin
+                            newMin += shift
+                            newMax += shift
+                        }
+                        if (newMax > fullMax) {
+                            val shift = newMax - fullMax
+                            newMin -= shift
+                            newMax -= shift
+                        }
                     }
-                    if (newMax > fullMax) {
-                        val shift = newMax - fullMax
-                        newMin -= shift
-                        newMax -= shift
-                    }
+
+                    visibleXMin = newMin.toLong().coerceAtLeast(fullXMin)
+                    visibleXMax = newMax.toLong().coerceAtMost(fullXMax)
                 }
-
-                visibleXMin = newMin.toLong().coerceAtLeast(fullXMin)
-                visibleXMax = newMax.toLong().coerceAtMost(fullXMax)
             }
-        }
     ) {
-        Canvas(modifier = Modifier.matchParentSize().pointerInput(points) {
-            detectTapGestures { tap ->
-                if (canvasSize.width == 0 || canvasSize.height == 0) return@detectTapGestures
-                val w = canvasSize.width.toFloat()
-                val h = canvasSize.height.toFloat()
-                val chartWidth = w - leftPaddingPx - rightPaddingPx
-                val chartHeight = h - topPaddingPx - bottomPaddingPx
+        Canvas(
+            modifier = Modifier.matchParentSize().pointerInput(points) {
+                detectTapGestures { tap ->
+                    if (canvasSize.width == 0 || canvasSize.height == 0) return@detectTapGestures
+                    val w = canvasSize.width.toFloat()
+                    val h = canvasSize.height.toFloat()
+                    val chartWidth = w - leftPaddingPx - rightPaddingPx
+                    val chartHeight = h - topPaddingPx - bottomPaddingPx
 
-                val rawYRange = if (yMaxAll - yMinAll == 0.0) 1.0 else yMaxAll - yMinAll
-                val yMinAdj = yMinAll - 0.1 * rawYRange
-                val yMaxAdj = yMaxAll + 0.1 * rawYRange
+                    val rawYRange = if (yMaxAll - yMinAll == 0.0) 1.0 else yMaxAll - yMinAll
+                    val yMinAdj = yMinAll - 0.1 * rawYRange
+                    val yMaxAdj = yMaxAll + 0.1 * rawYRange
 
-                fun xPos(x: Long): Float {
-                    if (visibleXMax == visibleXMin) return leftPaddingPx + chartWidth / 2f
-                    return leftPaddingPx + ((x - visibleXMin).toFloat() / (visibleXMax - visibleXMin).toFloat()) * chartWidth
-                }
+                    fun xPos(x: Long): Float {
+                        if (visibleXMax == visibleXMin) return leftPaddingPx + chartWidth / 2f
+                        return leftPaddingPx + ((x - visibleXMin).toFloat() / (visibleXMax - visibleXMin).toFloat()) * chartWidth
+                    }
 
-                fun yPos(y: Double): Float {
-                    val frac = ((y - yMinAdj) / (yMaxAdj - yMinAdj)).toFloat().coerceIn(0f, 1f)
-                    return topPaddingPx + (chartHeight * (1f - frac))
-                }
+                    fun yPos(y: Double): Float {
+                        val frac = ((y - yMinAdj) / (yMaxAdj - yMinAdj)).toFloat().coerceIn(0f, 1f)
+                        return topPaddingPx + (chartHeight * (1f - frac))
+                    }
 
-                // find nearest among visible points
-                var nearestIdx: Int? = null
-                var nearestDist = Float.MAX_VALUE
-                points.forEachIndexed { idx, p ->
-                    val px = xPos(p.first)
-                    if (px < leftPaddingPx || px > leftPaddingPx + chartWidth) return@forEachIndexed
-                    val py = yPos(p.second)
-                    val d = (px - tap.x) * (px - tap.x) + (py - tap.y) * (py - tap.y)
-                    if (d < nearestDist) {
-                        nearestDist = d
-                        nearestIdx = idx
+                    // find nearest among visible points
+                    var nearestIdx: Int? = null
+                    var nearestDist = Float.MAX_VALUE
+                    points.forEachIndexed { idx, p ->
+                        val px = xPos(p.first)
+                        if (px < leftPaddingPx || px > leftPaddingPx + chartWidth) return@forEachIndexed
+                        val py = yPos(p.second)
+                        val d = (px - tap.x) * (px - tap.x) + (py - tap.y) * (py - tap.y)
+                        if (d < nearestDist) {
+                            nearestDist = d
+                            nearestIdx = idx
+                        }
+                    }
+
+                    val chosen = nearestIdx
+                    if (chosen != null) {
+                        selectedIndex = chosen
+                        selectedOffset = Offset(xPos(points[chosen].first), yPos(points[chosen].second))
+                        onPointSelected?.invoke(chosen)
                     }
                 }
-
-                val chosen = nearestIdx
-                if (chosen != null) {
-                    selectedIndex = chosen
-                    selectedOffset = Offset(xPos(points[chosen].first), yPos(points[chosen].second))
-                    onPointSelected?.invoke(chosen)
-                }
             }
-        }) {
+        ) {
             val w = size.width
             val h = size.height
             val chartWidth = w - leftPaddingPx - rightPaddingPx
@@ -755,7 +843,11 @@ fun LineChart(
                 val frac = if (yLabelCount == 1) 0.5f else i.toFloat() / (yLabelCount - 1)
                 val yValue = yMaxAdj - frac * (yMaxAdj - yMinAdj)
                 val y = yPos(yValue)
-                drawLine(color = gridColor, start = Offset(leftPaddingPx, y), end = Offset(leftPaddingPx + chartWidth, y))
+                drawLine(
+                    color = gridColor,
+                    start = Offset(leftPaddingPx, y),
+                    end = Offset(leftPaddingPx + chartWidth, y)
+                )
                 val labelText = if (yValue % 1.0 == 0.0) "%.0f".format(yValue) else "%.1f".format(yValue)
                 drawContext.canvas.nativeCanvas.drawText(labelText, 4f, y + labelPaint.textSize / 2f, labelPaint)
             }
@@ -766,7 +858,12 @@ fun LineChart(
             for (xt in xTicks) {
                 val label = sdf.format(java.util.Date(xt))
                 val x = xPos(xt)
-                drawContext.canvas.nativeCanvas.drawText(label, x - labelPaint.measureText(label) / 2f, h - 4f, labelPaint)
+                drawContext.canvas.nativeCanvas.drawText(
+                    label,
+                    x - labelPaint.measureText(label) / 2f,
+                    h - 4f,
+                    labelPaint
+                )
             }
 
             // draw smooth path for visible points
@@ -797,12 +894,21 @@ fun LineChart(
                 drawCircle(color = Color.Red, radius = 4f, center = pt)
                 if (selectedIndex == idx) {
                     drawCircle(color = Color.Yellow, radius = 6f, center = pt)
-                    drawLine(color = Color.Gray, start = Offset(pt.x, topPaddingPx), end = Offset(pt.x, topPaddingPx + chartHeight))
+                    drawLine(
+                        color = Color.Gray,
+                        start = Offset(pt.x, topPaddingPx),
+                        end = Offset(pt.x, topPaddingPx + chartHeight)
+                    )
                 }
             }
 
             // border around chart area
-            drawRect(color = Color.LightGray, topLeft = Offset(leftPaddingPx, topPaddingPx), size = androidx.compose.ui.geometry.Size(chartWidth, chartHeight), style = Stroke(width = 1f))
+            drawRect(
+                color = Color.LightGray,
+                topLeft = Offset(leftPaddingPx, topPaddingPx),
+                size = androidx.compose.ui.geometry.Size(chartWidth, chartHeight),
+                style = Stroke(width = 1f)
+            )
         }
 
         // tooltip overlay
@@ -810,7 +916,7 @@ fun LineChart(
             val idx = selectedIndex!!
             val p = points[idx]
             val date = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(java.util.Date(p.first))
-            val text = "${date}: ${p.second} mg/dL"
+            val text = "$date: ${p.second} mg/dL"
             val tooltipDpX = with(density) { selectedOffset.x.toDp() }
             val tooltipDpY = with(density) { (selectedOffset.y - 36f).toDp() }
             Card(modifier = Modifier.offset(x = tooltipDpX, y = tooltipDpY)) {

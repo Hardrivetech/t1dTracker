@@ -1,15 +1,15 @@
 package com.hardrivetech.t1dtracker
 
 import androidx.room.migration.Migration
+import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
-import androidx.room.testing.MigrationTestHelper
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.Assert.*
 
 @RunWith(AndroidJUnit4::class)
 class RoomMigrationTest {
@@ -28,7 +28,8 @@ class RoomMigrationTest {
     fun migrate_1_to_2_preservesData() {
         // Create version 1 schema and insert a row (no 'notes' column)
         var db = helper.createDatabase(TEST_DB, 1).apply {
-            execSQL("""
+            execSQL(
+                """
                 CREATE TABLE IF NOT EXISTS insulin_entries (
                   id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                   timestamp INTEGER NOT NULL,
@@ -41,8 +42,11 @@ class RoomMigrationTest {
                   correctionDose REAL NOT NULL,
                   totalDose REAL NOT NULL
                 )
-            """.trimIndent())
-            execSQL("INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (1234567890, 50.0, 10.0, 140.0, 100.0, 50.0, 5.0, 0.8, 5.8)")
+                """.trimIndent()
+            )
+            execSQL(
+                "INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (1234567890, 50.0, 10.0, 140.0, 100.0, 50.0, 5.0, 0.8, 5.8)"
+            )
             close()
         }
 

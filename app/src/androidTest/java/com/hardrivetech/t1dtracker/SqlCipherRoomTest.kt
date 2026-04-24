@@ -3,14 +3,14 @@ package com.hardrivetech.t1dtracker
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.hardrivetech.t1dtracker.data.AppDatabase
+import com.hardrivetech.t1dtracker.data.InsulinEntry
 import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import com.hardrivetech.t1dtracker.data.AppDatabase
-import com.hardrivetech.t1dtracker.data.InsulinEntry
 
 @RunWith(AndroidJUnit4::class)
 class SqlCipherRoomTest {

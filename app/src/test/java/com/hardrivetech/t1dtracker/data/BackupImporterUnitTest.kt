@@ -3,6 +3,8 @@ package com.hardrivetech.t1dtracker.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import java.io.File
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -11,8 +13,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.io.File
-import java.nio.charset.StandardCharsets
 
 @RunWith(RobolectricTestRunner::class)
 class BackupImporterUnitTest {
@@ -38,7 +38,10 @@ class BackupImporterUnitTest {
         )
 
         val json = BackupUtil.buildJsonBackup(entries)
-        val encrypted = BackupUtil.encryptBackupWithPassword("test-password".toCharArray(), json.toByteArray(StandardCharsets.UTF_8))
+        val encrypted = BackupUtil.encryptBackupWithPassword(
+            "test-password".toCharArray(),
+            json.toByteArray(StandardCharsets.UTF_8)
+        )
         val outFile = File(context.cacheDir, "test_backup.b64")
         outFile.writeText(encrypted, Charsets.UTF_8)
 

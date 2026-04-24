@@ -2,8 +2,6 @@ package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
 import android.util.Base64
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.security.SecureRandom
@@ -12,10 +10,13 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import org.json.JSONArray
+import org.json.JSONObject
 
 object BackupUtil {
     private const val SALT_SIZE = 16
     private const val IV_SIZE = 12
+
     // Increased iterations for PBKDF2 to harden against offline attacks.
     // Updated to 400k in 2026 to strengthen against offline brute-force.
     private const val PBKDF2_ITERATIONS = 400_000
@@ -112,9 +113,9 @@ object BackupUtil {
                 if (combined.size < offset + 4 + SALT_SIZE + IV_SIZE) return null
                 val iterBytes = combined.copyOfRange(offset, offset + 4); offset += 4
                 iterations = ((iterBytes[0].toInt() and 0xFF) shl 24) or
-                        ((iterBytes[1].toInt() and 0xFF) shl 16) or
-                        ((iterBytes[2].toInt() and 0xFF) shl 8) or
-                        (iterBytes[3].toInt() and 0xFF)
+                    ((iterBytes[1].toInt() and 0xFF) shl 16) or
+                    ((iterBytes[2].toInt() and 0xFF) shl 8) or
+                    (iterBytes[3].toInt() and 0xFF)
                 salt = combined.copyOfRange(offset, offset + SALT_SIZE); offset += SALT_SIZE
                 iv = combined.copyOfRange(offset, offset + IV_SIZE); offset += IV_SIZE
                 cipherBytes = combined.copyOfRange(offset, combined.size)

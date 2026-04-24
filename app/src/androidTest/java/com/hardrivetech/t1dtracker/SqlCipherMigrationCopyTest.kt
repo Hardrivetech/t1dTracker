@@ -3,14 +3,14 @@ package com.hardrivetech.t1dtracker
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.hardrivetech.t1dtracker.data.AppDatabase
+import com.hardrivetech.t1dtracker.data.InsulinEntry
 import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import com.hardrivetech.t1dtracker.data.AppDatabase
-import com.hardrivetech.t1dtracker.data.InsulinEntry
 
 @RunWith(AndroidJUnit4::class)
 class SqlCipherMigrationCopyTest {
@@ -41,9 +41,14 @@ class SqlCipherMigrationCopyTest {
             )
             """.trimIndent()
         )
-        plainDb.execSQL("INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (3333333333, 25.0, 10.0, 130.0, 100.0, 50.0, 2.5, 0.6, 3.1)")
+        plainDb.execSQL(
+            "INSERT INTO insulin_entries (timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose) VALUES (3333333333, 25.0, 10.0, 130.0, 100.0, 50.0, 2.5, 0.6, 3.1)"
+        )
 
-        val cursor = plainDb.rawQuery("SELECT timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose FROM insulin_entries", null)
+        val cursor = plainDb.rawQuery(
+            "SELECT timestamp, carbs, icr, currentGlucose, targetGlucose, isf, carbDose, correctionDose, totalDose FROM insulin_entries",
+            null
+        )
         val rows = mutableListOf<InsulinEntry>()
         while (cursor.moveToNext()) {
             rows.add(

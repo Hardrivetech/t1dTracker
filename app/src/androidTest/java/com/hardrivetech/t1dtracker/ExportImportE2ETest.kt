@@ -2,14 +2,14 @@ package com.hardrivetech.t1dtracker
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.hardrivetech.t1dtracker.data.AppDatabase
+import com.hardrivetech.t1dtracker.data.BackupImporter
+import com.hardrivetech.t1dtracker.data.BackupUtil
+import com.hardrivetech.t1dtracker.data.InsulinEntry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import com.hardrivetech.t1dtracker.data.AppDatabase
-import com.hardrivetech.t1dtracker.data.InsulinEntry
-import com.hardrivetech.t1dtracker.data.BackupUtil
-import com.hardrivetech.t1dtracker.data.BackupImporter
 
 @RunWith(AndroidJUnit4::class)
 class ExportImportE2ETest {
@@ -54,7 +54,9 @@ class ExportImportE2ETest {
         assertTrue("Import should succeed", ok)
 
         val afterImport = dao.getAll()
-        assertTrue("Imported entries should contain the original item by timestamp+carbs",
-            afterImport.any { it.timestamp == timestamp && it.carbs == uniqueCarbs })
+        assertTrue(
+            "Imported entries should contain the original item by timestamp+carbs",
+            afterImport.any { it.timestamp == timestamp && it.carbs == uniqueCarbs }
+        )
     }
 }

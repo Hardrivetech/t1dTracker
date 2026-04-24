@@ -1,7 +1,6 @@
 package com.hardrivetech.t1dtracker
 
 import android.app.Application
-import android.util.Log
 
 class T1DApplication : Application() {
     override fun onCreate() {
@@ -16,7 +15,10 @@ class T1DApplication : Application() {
                     val crashCls = Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics")
                     val getInstance = crashCls.getMethod("getInstance")
                     val crashInstance = getInstance.invoke(null)
-                    val setEnabled = crashCls.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.javaPrimitiveType)
+                    val setEnabled = crashCls.getMethod(
+                        "setCrashlyticsCollectionEnabled",
+                        Boolean::class.javaPrimitiveType
+                    )
                     // Default to disabled; enable only after explicit user consent.
                     setEnabled.invoke(crashInstance, false)
                 } catch (t: Throwable) {

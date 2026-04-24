@@ -3,21 +3,21 @@ package com.hardrivetech.t1dtracker
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.security.KeyPairGeneratorSpec
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.math.BigInteger
+import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
+import java.util.Calendar
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.security.KeyPairGeneratorSpec
-import java.math.BigInteger
-import java.util.Calendar
 import javax.security.auth.x500.X500Principal
-import java.security.KeyPairGenerator
 
 object EncryptionUtil {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -140,14 +140,20 @@ object EncryptionUtil {
                 }
 
                 // As a last resort, do NOT persist raw key (insecure). Return transient key only.
-                AppLog.w("EncryptionUtil", "Wrapping unavailable on pre-M device; returning transient AES key (no persistent storage)")
+                AppLog.w(
+                    "EncryptionUtil",
+                    "Wrapping unavailable on pre-M device; returning transient AES key (no persistent storage)"
+                )
                 return key
             } catch (e: Exception) {
                 // If keystore not accessible, return a transient AES key (do NOT persist raw key)
                 val kg = KeyGenerator.getInstance("AES")
                 kg.init(256)
                 val key = kg.generateKey()
-                AppLog.w("EncryptionUtil", "Keystore not available; returning transient AES key (no persistent storage)")
+                AppLog.w(
+                    "EncryptionUtil",
+                    "Keystore not available; returning transient AES key (no persistent storage)"
+                )
                 return key
             }
         }
