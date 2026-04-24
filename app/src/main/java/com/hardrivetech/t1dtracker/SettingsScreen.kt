@@ -40,19 +40,14 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import com.hardrivetech.t1dtracker.data.AppDatabase
-import com.hardrivetech.t1dtracker.data.BackupImporter
 import com.hardrivetech.t1dtracker.data.BackupUtil
 import com.hardrivetech.t1dtracker.data.PrefsRepository
 import com.hardrivetech.t1dtracker.data.listMigrationBackups
 import com.hardrivetech.t1dtracker.data.restoreMigrationBackup
 import com.hardrivetech.t1dtracker.util.PasswordStrength
-import java.io.File
-import java.io.IOException
-import java.security.GeneralSecurityException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONException
 
 @Composable
 fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -> Unit) {
@@ -91,36 +86,7 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
     ) { uri: android.net.Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                try {
-                    val entries = db.insulinDao().getAll()
-                    val json = BackupUtil.buildJsonBackup(entries)
-                    val encrypted = BackupUtil.encryptBackupWithPassword(
-                        backupPassword.toCharArray(),
-                        json.toByteArray(Charsets.UTF_8)
-                    )
-                    context.contentResolver.openOutputStream(uri)?.use { out ->
-                        out.write(encrypted.toByteArray(Charsets.UTF_8))
-                    }
-                    true
-                } catch (e: IOException) {
-                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
-                    false
-                } catch (e: GeneralSecurityException) {
-                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
-                    false
-                } catch (e: IllegalArgumentException) {
-                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
-                    false
-                } catch (e: JSONException) {
-                    AppLog.e("SettingsScreen", "Export failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Export failed in Settings -> Export backup")
-                    false
-                }
-            }
+            val ok = SettingsActions.performExportToUri(context, db, uri, backupPassword.toCharArray())
             if (ok) {
                 Toast.makeText(context, context.getString(R.string.backup_exported), Toast.LENGTH_SHORT).show()
             } else {
@@ -134,26 +100,7 @@ fun SettingsScreen(db: AppDatabase, prefs: PrefsRepository, onNavigateBack: () -
     ) { uri: android.net.Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                try {
-                    val ins = context.contentResolver.openInputStream(uri) ?: return@withContext false
-                    val tmp = File(context.cacheDir, "import_tmp.t1d")
-                    ins.use { input -> tmp.outputStream().use { out -> input.copyTo(out) } }
-                    BackupImporter.importEncryptedBackupFile(context, db, tmp, backupPassword.toCharArray())
-                } catch (e: IOException) {
-                    AppLog.e("SettingsScreen", "Import failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Import failed in Settings -> Import backup")
-                    false
-                } catch (e: GeneralSecurityException) {
-                    AppLog.e("SettingsScreen", "Import failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Import failed in Settings -> Import backup")
-                    false
-                } catch (e: IllegalArgumentException) {
-                    AppLog.e("SettingsScreen", "Import failed: ${e.message}", e)
-                    TelemetryUtil.recordException(e, "Import failed in Settings -> Import backup")
-                    false
-                }
-            }
+            val ok = SettingsActions.performImportFromUri(context, db, uri, backupPassword.toCharArray())
             if (ok) {
                 Toast.makeText(context, context.getString(R.string.import_success), Toast.LENGTH_SHORT).show()
             } else {

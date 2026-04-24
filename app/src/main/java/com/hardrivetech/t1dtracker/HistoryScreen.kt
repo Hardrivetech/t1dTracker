@@ -676,7 +676,9 @@ private fun saveToDownloads(context: Context, filename: String, content: String,
             f.writeText(content)
             Toast.makeText(context, "Saved to app cache (Downloads failed): ${ex.message}", Toast.LENGTH_LONG).show()
         } catch (e2: IOException) {
-            Toast.makeText(context, "Save failed: ${ex.message}", Toast.LENGTH_LONG).show()
+            AppLog.w("HistoryScreen", "Save fallback failed: ${e2.message}")
+            TelemetryUtil.recordException(e2, "saveToDownloads fallback failed")
+            Toast.makeText(context, "Save failed: ${e2.message}", Toast.LENGTH_LONG).show()
         }
     } catch (ex: SecurityException) {
         try {
@@ -684,7 +686,9 @@ private fun saveToDownloads(context: Context, filename: String, content: String,
             f.writeText(content)
             Toast.makeText(context, "Saved to app cache (Downloads failed): ${ex.message}", Toast.LENGTH_LONG).show()
         } catch (e2: IOException) {
-            Toast.makeText(context, "Save failed: ${ex.message}", Toast.LENGTH_LONG).show()
+            AppLog.w("HistoryScreen", "Save fallback failed (security): ${e2.message}")
+            TelemetryUtil.recordException(e2, "saveToDownloads fallback failed (security)")
+            Toast.makeText(context, "Save failed: ${e2.message}", Toast.LENGTH_LONG).show()
         }
     }
 }
@@ -700,6 +704,7 @@ private fun savePublicLegacy(context: Context, filename: String, content: String
             context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri))
         } catch (e: SecurityException) {
             AppLog.w("HistoryScreen", "Broadcast failed: ${e.message}")
+            TelemetryUtil.recordException(e, "savePublicLegacy broadcast failed")
         }
         Toast.makeText(context, "Saved to Downloads: $filename", Toast.LENGTH_LONG).show()
     } catch (ex: IOException) {

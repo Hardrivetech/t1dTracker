@@ -19,6 +19,55 @@ object BackupUtil {
     private const val SALT_SIZE = 16
     private const val IV_SIZE = 12
 
+    private data class ParsedBackup(
+        val iterations: Int,
+        val salt: ByteArray,
+        val iv: ByteArray,
+        val cipherBytes: ByteArray
+    )
+
+    private fun parseCombinedBlob(combined: ByteArray, iterationsDefault: Int): ParsedBackup? {
+        // Return a ParsedBackup or null after a single return at the end.
+        var parsed: ParsedBackup? = null
+        if (combined.size >= SALT_SIZE + IV_SIZE) {
+            var offset = 0
+            var iterations = iterationsDefault
+            val salt: ByteArray
+            val iv: ByteArray
+            val cipherBytes: ByteArray
+
+            val hasMagic = combined.size >= MAGIC.size &&
+                combined.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)
+            if (hasMagic) {
+                offset += MAGIC.size
+                if (combined.size >= offset + 4 + SALT_SIZE + IV_SIZE) {
+                    val iterBytes = combined.copyOfRange(offset, offset + 4)
+                    offset += 4
+                    iterations = ((iterBytes[0].toInt() and 0xFF) shl 24) or
+                        ((iterBytes[1].toInt() and 0xFF) shl 16) or
+                        ((iterBytes[2].toInt() and 0xFF) shl 8) or
+                        (iterBytes[3].toInt() and 0xFF)
+                    salt = combined.copyOfRange(offset, offset + SALT_SIZE)
+                    offset += SALT_SIZE
+                    iv = combined.copyOfRange(offset, offset + IV_SIZE)
+                    offset += IV_SIZE
+                    cipherBytes = combined.copyOfRange(offset, combined.size)
+                    parsed = ParsedBackup(iterations, salt, iv, cipherBytes)
+                }
+            } else {
+                // Legacy format: salt|iv|ciphertext
+                if (combined.size >= SALT_SIZE + IV_SIZE) {
+                    salt = combined.copyOfRange(0, SALT_SIZE)
+                    iv = combined.copyOfRange(SALT_SIZE, SALT_SIZE + IV_SIZE)
+                    cipherBytes = combined.copyOfRange(SALT_SIZE + IV_SIZE, combined.size)
+                    parsed = ParsedBackup(iterationsDefault, salt, iv, cipherBytes)
+                }
+            }
+        }
+
+        return parsed
+    }
+
     // Increased iterations for PBKDF2 to harden against offline attacks.
     // Updated to 400k in 2026 to strengthen against offline brute-force.
     private const val PBKDF2_ITERATIONS = 400_000
@@ -116,68 +165,56 @@ object BackupUtil {
         combinedB64: String,
         iterationsDefault: Int = PBKDF2_ITERATIONS
     ): ByteArray? {
-        return try {
-            val combined = Base64.decode(combinedB64, Base64.NO_WRAP)
-            if (combined.size < SALT_SIZE + IV_SIZE) return null
-
-            var offset = 0
-            var iterations = iterationsDefault
-            val salt: ByteArray
-            val iv: ByteArray
-            val cipherBytes: ByteArray
-
-            // Check for new format with MAGIC prefix
-            val hasMagic = combined.size >= MAGIC.size &&
-                combined.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)
-            if (hasMagic) {
-                offset += MAGIC.size
-                if (combined.size < offset + 4 + SALT_SIZE + IV_SIZE) return null
-                val iterBytes = combined.copyOfRange(offset, offset + 4); offset += 4
-                iterations = ((iterBytes[0].toInt() and 0xFF) shl 24) or
-                    ((iterBytes[1].toInt() and 0xFF) shl 16) or
-                    ((iterBytes[2].toInt() and 0xFF) shl 8) or
-                    (iterBytes[3].toInt() and 0xFF)
-                salt = combined.copyOfRange(offset, offset + SALT_SIZE); offset += SALT_SIZE
-                iv = combined.copyOfRange(offset, offset + IV_SIZE); offset += IV_SIZE
-                cipherBytes = combined.copyOfRange(offset, combined.size)
-            } else {
-                // Legacy format: salt|iv|ciphertext
-                salt = combined.copyOfRange(0, SALT_SIZE)
-                iv = combined.copyOfRange(SALT_SIZE, SALT_SIZE + IV_SIZE)
-                cipherBytes = combined.copyOfRange(SALT_SIZE + IV_SIZE, combined.size)
+        var result: ByteArray? = null
+        var combined: ByteArray? = null
+        try {
+            combined = Base64.decode(combinedB64, Base64.NO_WRAP)
+            val parsed = parseCombinedBlob(combined, iterationsDefault)
+            if (parsed == null) {
+                AppLog.w("BackupUtil", "decryptBackupWithPassword failed: input too short or malformed")
+                TelemetryUtil.recordException(
+                    IllegalArgumentException("malformed backup blob"),
+                    "decryptBackupWithPassword failed"
+                )
+                return null
             }
 
             val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-            val spec = PBEKeySpec(password, salt, iterations, 256)
+            val spec = PBEKeySpec(password, parsed.salt, parsed.iterations, 256)
             try {
                 val tmp = factory.generateSecret(spec)
                 val tmpBytes = tmp.encoded
                 try {
                     val key = SecretKeySpec(tmpBytes, "AES")
-
                     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                    val gcm = GCMParameterSpec(128, iv)
+                    val gcm = GCMParameterSpec(128, parsed.iv)
                     cipher.init(Cipher.DECRYPT_MODE, key, gcm)
-                    val plain = cipher.doFinal(cipherBytes)
-                    try {
-                        plain
-                    } finally {
-                        plain.fill(0)
-                    }
+                    // Do not zero `plain` here; caller must zero returned byte[] when done.
+                    result = cipher.doFinal(parsed.cipherBytes)
                 } finally {
                     tmpBytes?.fill(0)
                 }
             } finally {
-                // Clear sensitive password material
                 spec.clearPassword()
             }
         } catch (e: GeneralSecurityException) {
-            null
+            AppLog.w("BackupUtil", "decryptBackupWithPassword failed (crypto): ${e.message}")
+            TelemetryUtil.recordException(e, "decryptBackupWithPassword failed")
+            result = null
         } catch (e: IllegalArgumentException) {
-            null
+            AppLog.w("BackupUtil", "decryptBackupWithPassword failed (invalid data): ${e.message}")
+            TelemetryUtil.recordException(e, "decryptBackupWithPassword failed")
+            result = null
         } catch (e: IOException) {
-            null
+            AppLog.w("BackupUtil", "decryptBackupWithPassword failed (I/O): ${e.message}")
+            TelemetryUtil.recordException(e, "decryptBackupWithPassword failed")
+            result = null
+        } finally {
+            // Zero temporary buffers
+            combined?.fill(0)
         }
+
+        return result
     }
 
     /**
@@ -191,23 +228,31 @@ object BackupUtil {
         entries: List<InsulinEntry>,
         password: CharArray
     ): File? {
+        var outFile: File? = null
         try {
             val json = buildJsonBackup(entries)
             val encrypted = encryptBackupWithPassword(password, json.toByteArray(Charsets.UTF_8))
-            val outFile = File(context.cacheDir, filename)
+            outFile = File(context.cacheDir, filename)
             FileOutputStream(outFile).use { stream ->
                 stream.write(encrypted.toByteArray(Charsets.UTF_8))
             }
-            return outFile
         } catch (e: IOException) {
-            return null
+            AppLog.w("BackupUtil", "createEncryptedBackupFile failed (I/O): ${e.message}")
+            TelemetryUtil.recordException(e, "createEncryptedBackupFile failed")
+            outFile = null
         } catch (e: GeneralSecurityException) {
-            return null
+            AppLog.w("BackupUtil", "createEncryptedBackupFile failed (crypto): ${e.message}")
+            TelemetryUtil.recordException(e, "createEncryptedBackupFile failed")
+            outFile = null
         } catch (e: IllegalArgumentException) {
-            return null
+            AppLog.w("BackupUtil", "createEncryptedBackupFile failed (invalid data): ${e.message}")
+            TelemetryUtil.recordException(e, "createEncryptedBackupFile failed")
+            outFile = null
         } finally {
             // Clear caller-provided password array (caller should pass a transient copy)
             password.fill('\u0000')
         }
+
+        return outFile
     }
 }

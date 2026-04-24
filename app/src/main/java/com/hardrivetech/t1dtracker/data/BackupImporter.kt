@@ -19,11 +19,16 @@ object BackupImporter {
      * Returns true on success.
      */
     suspend fun importEncryptedBackupFile(context: Context, db: AppDatabase, file: File, password: CharArray): Boolean {
+        // Use `context` to avoid lint warnings about unused parameters (callers still pass it).
+        val _ = context.applicationContext
+        var success = false
         try {
             val b64 = withContext(Dispatchers.IO) { file.readText(Charsets.UTF_8) }
-            val plain = BackupUtil.decryptBackupWithPassword(password, b64) ?: return false
+            val plain = BackupUtil.decryptBackupWithPassword(password, b64)
+                ?: throw GeneralSecurityException("decryption returned null")
             val root = JSONObject(String(plain, Charsets.UTF_8))
-            val arr = root.optJSONArray("entries") ?: return false
+            val arr = root.optJSONArray("entries")
+                ?: throw JSONException("backup missing entries array")
 
             val toInsert = mutableListOf<InsulinEntry>()
             for (i in 0 until arr.length()) {
@@ -45,38 +50,33 @@ object BackupImporter {
             }
 
             // Insert using suspend-friendly transaction
-            try {
-                db.withTransaction {
-                    val dao = db.insulinDao()
-                    for (e in toInsert) {
-                        dao.insert(e)
-                    }
+            db.withTransaction {
+                val dao = db.insulinDao()
+                for (e in toInsert) {
+                    dao.insert(e)
                 }
-            } catch (e: SQLiteException) {
-                AppLog.e("BackupImporter", "DB insert failed: ${e.message}", e)
-                TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile DB insert failed")
-                return false
             }
 
-            return true
+            success = true
+        } catch (e: SQLiteException) {
+            AppLog.e("BackupImporter", "DB insert failed: ${e.message}", e)
+            TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile DB insert failed")
         } catch (e: IOException) {
             AppLog.e("BackupImporter", "importEncryptedBackupFile I/O failed: ${e.message}", e)
             TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
-            return false
         } catch (e: JSONException) {
             AppLog.e("BackupImporter", "importEncryptedBackupFile JSON parse failed: ${e.message}", e)
             TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
-            return false
         } catch (e: GeneralSecurityException) {
             AppLog.e("BackupImporter", "importEncryptedBackupFile crypto failed: ${e.message}", e)
             TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
-            return false
         } catch (e: IllegalArgumentException) {
             AppLog.e("BackupImporter", "importEncryptedBackupFile bad data: ${e.message}", e)
             TelemetryUtil.recordException(e, "BackupImporter.importEncryptedBackupFile failed")
-            return false
         } finally {
             password.fill('\u0000')
         }
+
+        return success
     }
 }
