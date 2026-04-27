@@ -16,7 +16,7 @@ buildscript {
         // Static analysis plugins
         // Correct groupId for detekt Gradle plugin
         classpath "io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.0"
-        classpath "org.jlleitschuh.gradle:ktlint-gradle:11.6.0"
+        classpath "org.jlleitschuh.gradle:ktlint-gradle:14.2.0"
     }
 }
 
