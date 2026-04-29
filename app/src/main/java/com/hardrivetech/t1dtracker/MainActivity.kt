@@ -1,26 +1,13 @@
 package com.hardrivetech.t1dtracker
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Button
-import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -30,90 +17,52 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import androidx.core.graphics.toColorInt
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
-import com.hardrivetech.t1dtracker.data.AppDatabase
-import com.hardrivetech.t1dtracker.data.InsulinEntry
-import com.hardrivetech.t1dtracker.data.PrefsRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.hardrivetech.t1dtracker.ui.calculator.InsulinCalculatorScreen
+import com.hardrivetech.t1dtracker.ui.history.HistoryScreen
+import com.hardrivetech.t1dtracker.ui.settings.SettingsScreen
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Ensure the system status bar matches the app purple color
-        window.statusBarColor = "#6200EE".toColorInt()
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         setContent {
-            val ctx = LocalContext.current.applicationContext
-
-            val dbState = produceState<AppDatabase?>(initialValue = null) {
-                value = withContext(Dispatchers.IO) { AppDatabase.getInstance(ctx) }
-            }
-
-            val prefsState = produceState<PrefsRepository?>(initialValue = null) {
-                value = withContext(Dispatchers.IO) { PrefsRepository(ctx) }
-            }
-
-            if (dbState.value != null && prefsState.value != null) {
-                T1DTrackerApp(dbState.value!!, prefsState.value!!)
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
+            T1DTrackerApp()
         }
     }
 }
 
-@SuppressLint("ContextCastToActivity")
 @Composable
-fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
-    var screen by remember { mutableStateOf("calculator") }
-    val telemetryConsent by prefs.telemetryConsent.collectAsState(initial = false)
-    val biometricEnabled by prefs.biometricEnabled.collectAsState(initial = false)
-    val appContext = LocalContext.current
-    LaunchedEffect(telemetryConsent) {
-        TelemetryUtil.setTelemetryEnabled(appContext, telemetryConsent)
-    }
-    val activity = LocalContext.current as? FragmentActivity
-    val appScope = rememberCoroutineScope()
-    LaunchedEffect(biometricEnabled) {
-        handleBiometricEnabled(biometricEnabled, activity, prefs, appContext, appScope)
-    }
+fun T1DTrackerApp() {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route ?: "calculator"
 
     MaterialTheme {
         val primaryColor = MaterialTheme.colors.primary
         val useDarkIcons = primaryColor.luminance() > 0.5f
         val view = LocalView.current
         if (!view.isInEditMode) {
-            SideEffect {
-                val window = (view.context as Activity).window
-                window.statusBarColor = primaryColor.toArgb()
-                WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = useDarkIcons
-            }
+            val window = (view.context as Activity).window
+            window.statusBarColor = primaryColor.toArgb()
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = useDarkIcons
         }
-        val topTitle = when (screen) {
+
+        val topTitle = when (currentRoute) {
             "calculator" -> stringResource(R.string.calculator_title)
             "history" -> stringResource(R.string.history_title)
             "settings" -> stringResource(R.string.default_settings_title)
@@ -127,13 +76,21 @@ fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
                     backgroundColor = primaryColor,
                     contentColor = MaterialTheme.colors.onPrimary,
                     actions = {
-                        IconButton(onClick = { screen = if (screen == "calculator") "history" else "calculator" }) {
+                        IconButton(onClick = {
+                            if (currentRoute == "calculator") {
+                                navController.navigate("history")
+                            } else {
+                                navController.navigate("calculator") {
+                                    popUpTo("calculator") { inclusive = true }
+                                }
+                            }
+                        }) {
                             Icon(
-                                imageVector = if (screen == "calculator") Icons.Filled.ShowChart else Icons.Filled.Home,
+                                imageVector = if (currentRoute == "calculator") Icons.Filled.ShowChart else Icons.Filled.Home,
                                 contentDescription = stringResource(R.string.toggle_desc)
                             )
                         }
-                        IconButton(onClick = { screen = "settings" }) {
+                        IconButton(onClick = { navController.navigate("settings") }) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
                                 contentDescription = stringResource(R.string.settings_desc)
@@ -148,225 +105,17 @@ fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                when (screen) {
-                    "calculator" -> InsulinCalculatorScreen(db, prefs)
-                    "history" -> HistoryScreen(db)
-                    "settings" -> SettingsScreen(db, prefs) { screen = "calculator" }
-                    else -> InsulinCalculatorScreen(db, prefs)
-                }
+                T1DNavHost(navController)
             }
         }
     }
 }
 
 @Composable
-fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
-    var carbsText by remember { mutableStateOf("") }
-    var icrText by remember { mutableStateOf("") }
-    var currentText by remember { mutableStateOf("") }
-    var targetText by remember { mutableStateOf("") }
-    var isfText by remember { mutableStateOf("") }
-    var roundingText by remember { mutableStateOf("0.5") }
-
-    val defaultICR by prefs.defaultICR.collectAsState(initial = 0.0)
-    val defaultISF by prefs.defaultISF.collectAsState(initial = 0.0)
-    val defaultTarget by prefs.defaultTarget.collectAsState(initial = 0.0)
-
-    LaunchedEffect(defaultICR) {
-        if (icrText.isEmpty() && defaultICR > 0.0) {
-            icrText = defaultICR.toString()
-        }
-    }
-    LaunchedEffect(defaultISF) {
-        if (isfText.isEmpty() && defaultISF > 0.0) {
-            isfText = defaultISF.toString()
-        }
-    }
-    LaunchedEffect(defaultTarget) {
-        if (targetText.isEmpty() && defaultTarget > 0.0) {
-            targetText = defaultTarget.toString()
-        }
-    }
-
-    val doses = computeInsulinDoses(
-        InsulinInputs(
-            carbsText,
-            icrText,
-            currentText,
-            targetText,
-            isfText,
-            roundingText,
-            defaultICR,
-            defaultISF
-        )
-    )
-    val carbDose = doses.carbDose
-    val correctionDose = doses.correctionDose
-    val totalDose = doses.totalDose
-    val icr = doses.icr
-    val isf = doses.isf
-    val rounding = doses.rounding
-
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    var entries by remember { mutableStateOf(listOf<InsulinEntry>()) }
-
-    LaunchedEffect(db) { entries = db.insulinDao().getAll() }
-
-    Column(
-        modifier = Modifier
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(12.dp))
-        NumberField(stringResource(R.string.carbs_label), carbsText) { carbsText = it }
-        NumberField(stringResource(R.string.icr_label), icrText) { icrText = it }
-        Spacer(modifier = Modifier.height(8.dp))
-        NumberField(stringResource(R.string.current_glucose_label), currentText) { currentText = it }
-        NumberField(stringResource(R.string.target_glucose_label), targetText) { targetText = it }
-        NumberField(stringResource(R.string.isf_label), isfText) { isfText = it }
-        NumberField(stringResource(R.string.rounding_label), roundingText) { roundingText = it }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(carbDose)} U")
-        Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(correctionDose)} U")
-        Text(
-            "Total dose (rounded ${rounding}U): ${formatDose(totalDose)} U",
-            style = MaterialTheme.typography.h6
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        InsulinSaveButton(onSave = {
-            scope.launch {
-                val carbsVal = carbsText.toDoubleOrNull() ?: 0.0
-                val currentVal = currentText.toDoubleOrNull() ?: 0.0
-                val targetVal = targetText.toDoubleOrNull() ?: 0.0
-
-                val entry = InsulinEntry(
-                    timestamp = System.currentTimeMillis(),
-                    carbs = carbsVal,
-                    icr = icr,
-                    currentGlucose = currentVal,
-                    targetGlucose = targetVal,
-                    isf = isf,
-                    carbDose = carbDose,
-                    correctionDose = correctionDose,
-                    totalDose = totalDose
-                )
-                db.insulinDao().insert(entry)
-                entries = db.insulinDao().getAll()
-                Toast.makeText(context, context.getString(R.string.entry_saved), Toast.LENGTH_SHORT).show()
-            }
-        })
-
-        Spacer(modifier = Modifier.height(16.dp))
-        RecentEntriesList(entries = entries)
-    }
-}
-
-@Composable
-fun InsulinSaveButton(onSave: () -> Unit) {
-    Button(onClick = onSave) { Text(stringResource(R.string.save_entry)) }
-}
-
-@Composable
-fun RecentEntriesList(entries: List<InsulinEntry>) {
-    Text(stringResource(R.string.recent_entries), style = MaterialTheme.typography.subtitle1)
-    Spacer(modifier = Modifier.height(8.dp))
-    for (e in entries) {
-        Text("${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g")
-    }
-}
-
-@Composable
-fun NumberField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    )
-}
-
-fun formatDose(value: Double): String {
-    return if (value % 1.0 == 0.0) "%.0f".format(value) else "%.2f".format(value)
-}
-
-fun formatTime(ms: Long): String {
-    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
-    return sdf.format(java.util.Date(ms))
-}
-
-data class InsulinDoseResult(
-    val carbDose: Double,
-    val correctionDose: Double,
-    val totalDose: Double,
-    val icr: Double,
-    val isf: Double,
-    val rounding: Double
-)
-
-data class InsulinInputs(
-    val carbsText: String,
-    val icrText: String,
-    val currentText: String,
-    val targetText: String,
-    val isfText: String,
-    val roundingText: String,
-    val defaultICR: Double,
-    val defaultISF: Double
-)
-
-fun computeInsulinDoses(inputs: InsulinInputs): InsulinDoseResult {
-    val carbs = inputs.carbsText.toDoubleOrNull() ?: 0.0
-    val icrEntered = inputs.icrText.toDoubleOrNull() ?: 0.0
-    val icr = if (icrEntered > 0.0) icrEntered else inputs.defaultICR
-    val currentGlucose = inputs.currentText.toDoubleOrNull() ?: 0.0
-    val targetGlucose = inputs.targetText.toDoubleOrNull() ?: 0.0
-    val isfEntered = inputs.isfText.toDoubleOrNull() ?: 0.0
-    val isf = if (isfEntered > 0.0) isfEntered else inputs.defaultISF
-    val rounding = inputs.roundingText.toDoubleOrNull() ?: 0.5
-
-    val carbDose = if (icr > 0) carbs / icr else 0.0
-    val correctionDose = if (isf > 0 && currentGlucose > targetGlucose) {
-        (currentGlucose - targetGlucose) / isf
-    } else {
-        0.0
-    }
-    val totalDoseRaw = carbDose + correctionDose
-    val totalDose = kotlin.math.round(totalDoseRaw / rounding) * rounding
-
-    return InsulinDoseResult(carbDose, correctionDose, totalDose, icr, isf, rounding)
-}
-
-fun handleBiometricEnabled(
-    biometricEnabled: Boolean,
-    activity: FragmentActivity?,
-    prefs: PrefsRepository,
-    appContext: android.content.Context,
-    appScope: kotlinx.coroutines.CoroutineScope
-) {
-    if (biometricEnabled) {
-        if (activity == null) {
-            appScope.launch { prefs.setBiometricEnabled(false) }
-        } else if (!BiometricAuth.isAvailable(appContext)) {
-            Toast.makeText(
-                appContext,
-                appContext.getString(R.string.biometric_unavailable_disabling),
-                Toast.LENGTH_SHORT
-            ).show()
-            appScope.launch { prefs.setBiometricEnabled(false) }
-        } else {
-            appScope.launch {
-                val ok = BiometricAuth.authenticate(activity, "Unlock t1dTracker", "Authenticate to continue")
-                if (!ok) {
-                    activity.finish()
-                }
-            }
-        }
+fun T1DNavHost(navController: NavHostController) {
+    NavHost(navController = navController, startDestination = "calculator") {
+        composable("calculator") { InsulinCalculatorScreen() }
+        composable("history") { HistoryScreen() }
+        composable("settings") { SettingsScreen { navController.popBackStack() } }
     }
 }

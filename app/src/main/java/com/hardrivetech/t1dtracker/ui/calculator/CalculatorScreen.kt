@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hardrivetech.t1dtracker.R
 import com.hardrivetech.t1dtracker.data.InsulinEntry
+import com.hardrivetech.t1dtracker.insulin.DoseInput
+import com.hardrivetech.t1dtracker.insulin.InsulinCalculator
 
 @Composable
 fun InsulinCalculatorScreen(
@@ -29,16 +31,24 @@ fun InsulinCalculatorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val carbs = uiState.carbs.toDoubleOrNull() ?: 0.0
-    val icr = uiState.icr.toDoubleOrNull() ?: 0.0
-    val current = uiState.currentGlucose.toDoubleOrNull() ?: 0.0
-    val target = uiState.targetGlucose.toDoubleOrNull() ?: 0.0
-    val isf = uiState.isf.toDoubleOrNull() ?: 0.0
-    val rounding = uiState.rounding.toDoubleOrNull() ?: 0.5
+    val currentInput = DoseInput(
+        carbs = uiState.carbs.toDoubleOrNull() ?: 0.0,
+        icr = uiState.icr.toDoubleOrNull() ?: 0.0,
+        currentGlucose = uiState.currentGlucose.toDoubleOrNull() ?: 0.0,
+        targetGlucose = uiState.targetGlucose.toDoubleOrNull() ?: 0.0,
+        isf = uiState.isf.toDoubleOrNull() ?: 0.0,
+        rounding = uiState.rounding.toDoubleOrNull() ?: 0.5
+    )
+    val result = InsulinCalculator.calculateDose(currentInput)
 
-    val carbDose = if (icr > 0) carbs / icr else 0.0
-    val correctionDose = if (isf > 0 && current > target) (current - target) / isf else 0.0
-    val totalDose = kotlin.math.round((carbDose + correctionDose) / rounding) * rounding
+    if (uiState.showConfirmation && uiState.pendingInput != null && uiState.pendingResult != null) {
+        DoseConfirmationDialog(
+            input = uiState.pendingInput!!,
+            result = uiState.pendingResult!!,
+            onConfirm = { viewModel.confirmSave() },
+            onDismiss = { viewModel.dismissConfirmation() }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -55,19 +65,22 @@ fun InsulinCalculatorScreen(
         NumberField(stringResource(R.string.rounding_label), uiState.rounding) { viewModel.onRoundingChange(it) }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(carbDose)} U")
-        Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(correctionDose)} U")
+        Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(result.carbDose)} U")
+        Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(result.correctionDose)} U")
         Text(
-            "Total dose (rounded ${rounding}U): ${formatDose(totalDose)} U",
+            stringResource(R.string.total_dose_label, currentInput.rounding) + ": ${formatDose(result.totalDoseRounded)} U",
             style = MaterialTheme.typography.h6
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { viewModel.saveEntry() }) {
+        Button(
+            onClick = { viewModel.onSaveClick() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text(stringResource(R.string.save_entry))
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         RecentEntriesList(entries = uiState.entries)
     }
 }

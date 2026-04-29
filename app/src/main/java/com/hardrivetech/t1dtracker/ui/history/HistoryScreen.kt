@@ -27,11 +27,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.hardrivetech.t1dtracker.ExportOptionsDialog
 import com.hardrivetech.t1dtracker.LineChart
+import com.hardrivetech.t1dtracker.R
 import com.hardrivetech.t1dtracker.data.InsulinEntry
 import com.hardrivetech.t1dtracker.ui.calculator.formatDose
 import com.hardrivetech.t1dtracker.ui.calculator.formatTime
@@ -58,7 +59,7 @@ fun HistoryScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (uiState.entries.isEmpty()) {
-            Text("No entries for selected range.")
+            Text(stringResource(R.string.no_entries_range))
         } else {
             val points = uiState.entries.sortedBy { it.timestamp }.map { it.timestamp to it.currentGlucose }
             LineChart(
@@ -73,7 +74,7 @@ fun HistoryScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text("Recent entries:", style = MaterialTheme.typography.subtitle1)
+            Text(stringResource(R.string.recent_entries), style = MaterialTheme.typography.subtitle1)
             Spacer(modifier = Modifier.height(8.dp))
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(uiState.entries) { e ->
@@ -132,7 +133,7 @@ private fun HistoryHeader(currentFilter: Int, onFilterChange: (Int) -> Unit, onE
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { onFilterChange(Int.MAX_VALUE) }, enabled = currentFilter != Int.MAX_VALUE) { Text("All") }
         }
-        Button(onClick = onExport) { Text("Export") }
+        Button(onClick = onExport) { Text(stringResource(R.string.export)) }
     }
 }
 
@@ -145,28 +146,28 @@ private fun EntryDetailsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Entry details") },
+        title = { Text(stringResource(R.string.entry_details_title)) },
         text = {
             Column {
-                Text("Date: ${formatTime(entry.timestamp)}")
-                Text("Carbs: ${entry.carbs} g")
-                Text("ICR: ${entry.icr}")
-                Text("ISF: ${entry.isf}")
-                Text("Current: ${entry.currentGlucose} mg/dL")
-                Text("Target: ${entry.targetGlucose} mg/dL")
-                Text("Carb dose: ${formatDose(entry.carbDose)} U")
-                Text("Correction dose: ${formatDose(entry.correctionDose)} U")
-                Text("Total dose: ${formatDose(entry.totalDose)} U")
-                if (!entry.notes.isNullOrBlank()) Text("Notes: ${entry.notes}")
+                Text(stringResource(R.string.date_label, formatTime(entry.timestamp)))
+                Text(stringResource(R.string.carbs_val, entry.carbs))
+                Text(stringResource(R.string.icr_val, entry.icr))
+                Text(stringResource(R.string.isf_val, entry.isf))
+                Text(stringResource(R.string.current_bg_val, entry.currentGlucose))
+                Text(stringResource(R.string.target_bg_val, entry.targetGlucose))
+                Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(entry.carbDose)} U")
+                Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(entry.correctionDose)} U")
+                Text("${stringResource(R.string.total_dose_label, entry.icr)}: ${formatDose(entry.totalDose)} U")
+                if (!entry.notes.isNullOrBlank()) Text(stringResource(R.string.notes_val, entry.notes))
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { onEdit(entry) }) { Text("Edit") }
-                    TextButton(onClick = { onDelete(entry) }) { Text("Delete", color = Color.Red) }
+                    TextButton(onClick = { onEdit(entry) }) { Text(stringResource(R.string.edit)) }
+                    TextButton(onClick = { onDelete(entry) }) { Text(stringResource(R.string.delete), color = Color.Red) }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
         }
     )
 }
@@ -182,43 +183,43 @@ private fun EntryEditDialog(orig: InsulinEntry, onDismiss: () -> Unit, onSave: (
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit entry") },
+        title = { Text(stringResource(R.string.edit_entry_title)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = editCarbsText,
                     onValueChange = { editCarbsText = it },
-                    label = { Text("Carbs (g)") },
+                    label = { Text(stringResource(R.string.carbs_g)) },
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = editIcrText,
                     onValueChange = { editIcrText = it },
-                    label = { Text("ICR (g per unit)") },
+                    label = { Text(stringResource(R.string.icr_units)) },
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = editCurrentText,
                     onValueChange = { editCurrentText = it },
-                    label = { Text("Current glucose (mg/dL)") },
+                    label = { Text(stringResource(R.string.current_bg)) },
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = editTargetText,
                     onValueChange = { editTargetText = it },
-                    label = { Text("Target glucose (mg/dL)") },
+                    label = { Text(stringResource(R.string.target_bg)) },
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = editIsfText,
                     onValueChange = { editIsfText = it },
-                    label = { Text("ISF (mg/dL per unit)") },
+                    label = { Text(stringResource(R.string.isf_units)) },
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = editNotesText,
                     onValueChange = { editNotesText = it },
-                    label = { Text("Notes") }
+                    label = { Text(stringResource(R.string.notes_label)) }
                 )
             }
         },
@@ -250,10 +251,10 @@ private fun EntryEditDialog(orig: InsulinEntry, onDismiss: () -> Unit, onSave: (
                     notes = editNotesText.ifBlank { null }
                 )
                 onSave(updated)
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

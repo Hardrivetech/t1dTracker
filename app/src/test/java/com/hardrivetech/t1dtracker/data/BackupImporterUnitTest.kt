@@ -1,6 +1,7 @@
 package com.hardrivetech.t1dtracker.data
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
@@ -28,13 +29,14 @@ class BackupImporterUnitTest {
     @After
     fun tearDown() {
         try { db.close() } catch (e: Exception) {
-            AppLog.w("BackupImporterUnitTest", "Close DB failed: ${e.message}")
+            Log.w("BackupImporterUnitTest", "Close DB failed: ${e.message}")
         }
     }
 
     @Test
-    fun importEncryptedBackupFile_insertsEntries() = runBlocking {
-        val entries = listOf(
+    fun importEncryptedBackupFile_insertsEntries() {
+        runBlocking {
+            val entries = listOf(
             InsulinEntry(
                 id = 0L,
                 timestamp = System.currentTimeMillis(),
@@ -78,7 +80,8 @@ class BackupImporterUnitTest {
         assertEquals(entries.size, all.size)
 
         try { outFile.delete() } catch (e: Exception) {
-            AppLog.w("BackupImporterUnitTest", "Delete temp file failed: ${e.message}")
+            Log.w("BackupImporterUnitTest", "Delete temp file failed: ${e.message}")
         }
+    }
     }
 }

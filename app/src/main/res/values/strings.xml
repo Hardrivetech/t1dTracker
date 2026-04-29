@@ -87,6 +87,40 @@
 
     <string name="privacy_policy_title">Privacy policy</string>
     <string name="privacy_policy_contact">To request data deletion or help, contact: hardrivetech@proton.me</string>
+
+    <string name="no_entries_range">No entries for selected range.</string>
+    <string name="no_data">No data</string>
+    <string name="entry_details_title">Entry details</string>
+    <string name="edit_entry_title">Edit entry</string>
+    <string name="confirm_dose_title">Confirm Dose</string>
+    <string name="summary_label">Summary:</string>
+    <string name="calculated_dose_label">Calculated Dose:</string>
+    <string name="confirm_save">Confirm &amp; Save</string>
+    <string name="warnings_label">Warnings:</string>
+    <string name="extreme_carbs_warning">Extreme carbs warning: > %1$dg</string>
+    <string name="extreme_high_bg_warning">Extreme high BG warning: > %1$dmg/dL</string>
+    <string name="extreme_low_bg_warning">Extreme low BG warning: &lt; %1$dmg/dL</string>
+    <string name="high_dose_warning">High dose warning: >= %1$dU</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="personal_defaults_title">Personal Defaults</string>
+    <string name="app_settings_title">App Settings</string>
+    <string name="back_to_calculator">Back to Calculator</string>
+    <string name="carbs_g">Carbs (g)</string>
+    <string name="icr_units">ICR (g per unit)</string>
+    <string name="current_bg">Current glucose (mg/dL)</string>
+    <string name="target_bg">Target glucose (mg/dL)</string>
+    <string name="isf_units">ISF (mg/dL per unit)</string>
+    <string name="notes_label">Notes</string>
+    <string name="date_label">Date: %1$s</string>
+    <string name="carbs_val">Carbs: %1$s g</string>
+    <string name="icr_val">ICR: %1$s</string>
+    <string name="isf_val">ISF: %1$s</string>
+    <string name="current_bg_val">Current: %1$s mg/dL</string>
+    <string name="target_bg_val">Target: %1$s mg/dL</string>
+    <string name="notes_val">Notes: %1$s</string>
+    <string name="export">Export</string>
+
     <string name="save">Save</string>
     <string name="close">Close</string>
 </resources>

@@ -38,33 +38,33 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Text("Personal Defaults", style = MaterialTheme.typography.h6)
+        Text(stringResource(R.string.personal_defaults_title), style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(8.dp))
         
-        DefaultNumberField("Default ICR", uiState.defaultICR) { viewModel.updateDefaultICR(it) }
-        DefaultNumberField("Default ISF", uiState.defaultISF) { viewModel.updateDefaultISF(it) }
-        DefaultNumberField("Default Target", uiState.defaultTarget) { viewModel.updateDefaultTarget(it) }
+        DefaultNumberField(stringResource(R.string.default_icr_label), uiState.defaultICR) { viewModel.updateDefaultICR(it) }
+        DefaultNumberField(stringResource(R.string.default_isf_label), uiState.defaultISF) { viewModel.updateDefaultISF(it) }
+        DefaultNumberField(stringResource(R.string.default_target_label), uiState.defaultTarget) { viewModel.updateDefaultTarget(it) }
 
         Spacer(modifier = Modifier.height(24.dp))
         Divider()
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("App Settings", style = MaterialTheme.typography.h6)
+        Text(stringResource(R.string.app_settings_title), style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Allow Telemetry", modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.allow_telemetry), modifier = Modifier.weight(1f))
             Switch(checked = uiState.telemetryConsent, onCheckedChange = { viewModel.updateTelemetryConsent(it) })
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Enable Biometric Lock", modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.require_biometric), modifier = Modifier.weight(1f))
             Switch(checked = uiState.biometricEnabled, onCheckedChange = { viewModel.updateBiometricEnabled(it) })
         }
 
         Spacer(modifier = Modifier.height(32.dp))
         Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Back to Calculator")
+            Text(stringResource(R.string.back_to_calculator))
         }
     }
 }

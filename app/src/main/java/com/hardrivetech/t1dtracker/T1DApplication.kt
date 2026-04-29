@@ -1,36 +1,24 @@
 package com.hardrivetech.t1dtracker
 
 import android.app.Application
+import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class T1DApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Initialize Firebase / Crashlytics if available (guarded via reflection)
+        
+        // Initialize Firebase if it's available in the classpath
+        // The check is still useful because build.gradle only applies the plugin if google-services.json exists
         try {
-            val firebaseApp = Class.forName("com.google.firebase.FirebaseApp")
-            val initializeApp = firebaseApp.getMethod("initializeApp", android.content.Context::class.java)
-            val app = initializeApp.invoke(null, this)
-            if (app != null) {
-                try {
-                    val crashCls = Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics")
-                    val getInstance = crashCls.getMethod("getInstance")
-                    val crashInstance = getInstance.invoke(null)
-                    val setEnabled = crashCls.getMethod(
-                        "setCrashlyticsCollectionEnabled",
-                        Boolean::class.javaPrimitiveType
-                    )
-                    // Default to disabled; enable only after explicit user consent.
-                    setEnabled.invoke(crashInstance, false)
-                } catch (e: ReflectiveOperationException) {
-                    AppLog.i("T1DApplication", "Crashlytics not available: ${e.message}")
-                } catch (e: SecurityException) {
-                    AppLog.i("T1DApplication", "Crashlytics not available: ${e.message}")
-                }
-            }
-        } catch (e: ReflectiveOperationException) {
-            AppLog.i("T1DApplication", "Firebase not configured: ${e.message}")
-        } catch (e: SecurityException) {
-            AppLog.i("T1DApplication", "Firebase not configured: ${e.message}")
+            FirebaseApp.initializeApp(this)
+            // Default to disabled; enable only after explicit user consent if needed.
+            // For now, we follow the previous logic of keeping it disabled initially.
+            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(false)
+        } catch (e: Exception) {
+            AppLog.i("T1DApplication", "Firebase not initialized: ${e.message}")
         }
     }
 }
