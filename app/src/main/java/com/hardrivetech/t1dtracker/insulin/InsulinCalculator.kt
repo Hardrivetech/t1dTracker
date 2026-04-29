@@ -1,5 +1,14 @@
 package com.hardrivetech.t1dtracker.insulin
 
+data class DoseInput(
+    val carbs: Double,
+    val icr: Double,
+    val current: Double,
+    val target: Double,
+    val isf: Double,
+    val rounding: Double
+)
+
 object InsulinCalculator {
     fun carbDose(carbs: Double, icr: Double): Double {
         if (icr <= 0.0) return 0.0
@@ -17,10 +26,10 @@ object InsulinCalculator {
         return kotlin.math.round(dose / step) * step
     }
 
-    fun totalDose(carbs: Double, icr: Double, current: Double, target: Double, isf: Double, rounding: Double): Double {
-        val cDose = carbDose(carbs, icr)
-        val corr = correctionDose(current, target, isf)
+    fun totalDose(input: DoseInput): Double {
+        val cDose = carbDose(input.carbs, input.icr)
+        val corr = correctionDose(input.current, input.target, input.isf)
         val total = cDose + corr
-        return roundDose(total, rounding)
+        return roundDose(total, input.rounding)
     }
 }

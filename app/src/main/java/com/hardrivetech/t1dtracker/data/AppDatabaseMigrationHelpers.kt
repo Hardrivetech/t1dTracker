@@ -1,6 +1,7 @@
 package com.hardrivetech.t1dtracker.data
 
 import android.database.sqlite.SQLiteException
+import androidx.room.withTransaction
 import com.hardrivetech.t1dtracker.AppLog
 import com.hardrivetech.t1dtracker.TelemetryUtil
 import java.io.IOException

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
@@ -33,9 +35,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -50,7 +54,9 @@ import androidx.fragment.app.FragmentActivity
 import com.hardrivetech.t1dtracker.data.AppDatabase
 import com.hardrivetech.t1dtracker.data.InsulinEntry
 import com.hardrivetech.t1dtracker.data.PrefsRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,10 +64,24 @@ class MainActivity : FragmentActivity() {
         // Ensure the system status bar matches the app purple color
         window.statusBarColor = "#6200EE".toColorInt()
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
-        val db = AppDatabase.getInstance(applicationContext)
-        val prefs = PrefsRepository(applicationContext)
         setContent {
-            T1DTrackerApp(db, prefs)
+            val ctx = LocalContext.current.applicationContext
+
+            val dbState = produceState<AppDatabase?>(initialValue = null) {
+                value = withContext(Dispatchers.IO) { AppDatabase.getInstance(ctx) }
+            }
+
+            val prefsState = produceState<PrefsRepository?>(initialValue = null) {
+                value = withContext(Dispatchers.IO) { PrefsRepository(ctx) }
+            }
+
+            if (dbState.value != null && prefsState.value != null) {
+                T1DTrackerApp(dbState.value!!, prefsState.value!!)
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
 }
@@ -79,25 +99,7 @@ fun T1DTrackerApp(db: AppDatabase, prefs: PrefsRepository) {
     val activity = LocalContext.current as? FragmentActivity
     val appScope = rememberCoroutineScope()
     LaunchedEffect(biometricEnabled) {
-        if (biometricEnabled) {
-            if (activity == null) {
-                appScope.launch { prefs.setBiometricEnabled(false) }
-            } else {
-                if (!BiometricAuth.isAvailable(appContext)) {
-                    Toast.makeText(
-                        appContext,
-                        appContext.getString(R.string.biometric_unavailable_disabling),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    appScope.launch { prefs.setBiometricEnabled(false) }
-                } else {
-                    val ok = BiometricAuth.authenticate(activity, "Unlock t1dTracker", "Authenticate to continue")
-                    if (!ok) {
-                        activity.finish()
-                    }
-                }
-            }
-        }
+        handleBiometricEnabled(biometricEnabled, activity, prefs, appContext, appScope)
     }
 
     MaterialTheme {
@@ -186,23 +188,24 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
         }
     }
 
-    val carbs = carbsText.toDoubleOrNull() ?: 0.0
-    val icrEntered = icrText.toDoubleOrNull() ?: 0.0
-    val icr = if (icrEntered > 0.0) icrEntered else defaultICR
-    val currentGlucose = currentText.toDoubleOrNull() ?: 0.0
-    val targetGlucose = targetText.toDoubleOrNull() ?: 0.0
-    val isfEntered = isfText.toDoubleOrNull() ?: 0.0
-    val isf = if (isfEntered > 0.0) isfEntered else defaultISF
-    val rounding = roundingText.toDoubleOrNull() ?: 0.5
-
-    val carbDose = if (icr > 0) carbs / icr else 0.0
-    val correctionDose = if (isf > 0 && currentGlucose > targetGlucose) {
-        (currentGlucose - targetGlucose) / isf
-    } else {
-        0.0
-    }
-    val totalDoseRaw = carbDose + correctionDose
-    val totalDose = (kotlin.math.round(totalDoseRaw / rounding) * rounding)
+    val doses = computeInsulinDoses(
+        InsulinInputs(
+            carbsText,
+            icrText,
+            currentText,
+            targetText,
+            isfText,
+            roundingText,
+            defaultICR,
+            defaultISF
+        )
+    )
+    val carbDose = doses.carbDose
+    val correctionDose = doses.correctionDose
+    val totalDose = doses.totalDose
+    val icr = doses.icr
+    val isf = doses.isf
+    val rounding = doses.rounding
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -233,16 +236,22 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
             style = MaterialTheme.typography.h6
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = {
+        Spacer(modifier = Modifier.height(16.dp))
+        InsulinSaveButton(onSave = {
             scope.launch {
+                val carbsVal = carbsText.toDoubleOrNull() ?: 0.0
+                val currentVal = currentText.toDoubleOrNull() ?: 0.0
+                val targetVal = targetText.toDoubleOrNull() ?: 0.0
+                val icrVal = icr
+                val isfVal = isf
+
                 val entry = InsulinEntry(
                     timestamp = System.currentTimeMillis(),
-                    carbs = carbs,
-                    icr = icr,
-                    currentGlucose = currentGlucose,
-                    targetGlucose = targetGlucose,
-                    isf = isf,
+                    carbs = carbsVal,
+                    icr = icrVal,
+                    currentGlucose = currentVal,
+                    targetGlucose = targetVal,
+                    isf = isfVal,
                     carbDose = carbDose,
                     correctionDose = correctionDose,
                     totalDose = totalDose
@@ -251,14 +260,24 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
                 entries = db.insulinDao().getAll()
                 Toast.makeText(context, context.getString(R.string.entry_saved), Toast.LENGTH_SHORT).show()
             }
-        }) { Text(stringResource(R.string.save_entry)) }
+        })
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text(stringResource(R.string.recent_entries), style = MaterialTheme.typography.subtitle1)
-        Spacer(modifier = Modifier.height(8.dp))
-        for (e in entries) {
-            Text("${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g")
-        }
+        RecentEntriesList(entries = entries)
+    }
+}
+
+@Composable
+fun InsulinSaveButton(onSave: () -> Unit) {
+    Button(onClick = onSave) { Text(stringResource(R.string.save_entry)) }
+}
+
+@Composable
+fun RecentEntriesList(entries: List<InsulinEntry>) {
+    Text(stringResource(R.string.recent_entries), style = MaterialTheme.typography.subtitle1)
+    Spacer(modifier = Modifier.height(8.dp))
+    for (e in entries) {
+        Text("${formatTime(e.timestamp)} — ${formatDose(e.totalDose)} U — ${e.carbs} g")
     }
 }
 
@@ -282,4 +301,74 @@ fun formatDose(value: Double): String {
 fun formatTime(ms: Long): String {
     val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(ms))
+}
+
+data class InsulinDoseResult(
+    val carbDose: Double,
+    val correctionDose: Double,
+    val totalDose: Double,
+    val icr: Double,
+    val isf: Double,
+    val rounding: Double
+)
+
+data class InsulinInputs(
+    val carbsText: String,
+    val icrText: String,
+    val currentText: String,
+    val targetText: String,
+    val isfText: String,
+    val roundingText: String,
+    val defaultICR: Double,
+    val defaultISF: Double
+)
+
+fun computeInsulinDoses(inputs: InsulinInputs): InsulinDoseResult {
+    val carbs = inputs.carbsText.toDoubleOrNull() ?: 0.0
+    val icrEntered = inputs.icrText.toDoubleOrNull() ?: 0.0
+    val icr = if (icrEntered > 0.0) icrEntered else inputs.defaultICR
+    val currentGlucose = inputs.currentText.toDoubleOrNull() ?: 0.0
+    val targetGlucose = inputs.targetText.toDoubleOrNull() ?: 0.0
+    val isfEntered = inputs.isfText.toDoubleOrNull() ?: 0.0
+    val isf = if (isfEntered > 0.0) isfEntered else inputs.defaultISF
+    val rounding = inputs.roundingText.toDoubleOrNull() ?: 0.5
+
+    val carbDose = if (icr > 0) carbs / icr else 0.0
+    val correctionDose = if (isf > 0 && currentGlucose > targetGlucose) {
+        (currentGlucose - targetGlucose) / isf
+    } else {
+        0.0
+    }
+    val totalDoseRaw = carbDose + correctionDose
+    val totalDose = kotlin.math.round(totalDoseRaw / rounding) * rounding
+
+    return InsulinDoseResult(carbDose, correctionDose, totalDose, icr, isf, rounding)
+}
+
+fun handleBiometricEnabled(
+    biometricEnabled: Boolean,
+    activity: FragmentActivity?,
+    prefs: PrefsRepository,
+    appContext: android.content.Context,
+    appScope: kotlinx.coroutines.CoroutineScope
+) {
+    if (biometricEnabled) {
+        if (activity == null) {
+            appScope.launch { prefs.setBiometricEnabled(false) }
+        } else if (!BiometricAuth.isAvailable(appContext)) {
+            Toast.makeText(
+                appContext,
+                appContext.getString(R.string.biometric_unavailable_disabling),
+                Toast.LENGTH_SHORT
+            ).show()
+            appScope.launch { prefs.setBiometricEnabled(false) }
+        } else {
+            appScope.launch {
+                val ok = BiometricAuth.authenticate(activity, "Unlock t1dTracker", "Authenticate to continue")
+                if (!ok) {
+                    activity.finish()
+                }
+            }
+        }
+    }
 }

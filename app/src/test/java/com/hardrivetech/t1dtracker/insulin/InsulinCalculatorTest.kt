@@ -32,12 +32,14 @@ class InsulinCalculatorTest {
     @Test
     fun totalDose_combined() {
         val total = InsulinCalculator.totalDose(
-            carbs = 30.0,
-            icr = 15.0,
-            current = 10.0,
-            target = 5.0,
-            isf = 5.0,
-            rounding = 0.5
+            DoseInput(
+                carbs = 30.0,
+                icr = 15.0,
+                current = 10.0,
+                target = 5.0,
+                isf = 5.0,
+                rounding = 0.5
+            )
         )
         // carbDose = 2.0, correction = 1.0 => total 3.0 -> rounded to 3.0
         assertEquals(3.0, total, 1e-6)

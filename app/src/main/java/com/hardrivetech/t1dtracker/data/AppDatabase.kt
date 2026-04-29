@@ -21,6 +21,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun insulinDao(): InsulinDao
 
     companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
         // Migration from schema version 1 -> 2: add the optional `notes` column
         // to `insulin_entries`. This is non-destructive and will add a NULLable
         // TEXT column for older databases.

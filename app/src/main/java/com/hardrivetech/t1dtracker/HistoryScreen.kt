@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -165,13 +164,18 @@ fun HistoryScreen(db: AppDatabase) {
 
 @Composable
 private fun HistoryHeader(currentFilter: Int, onFilterChange: (Int) -> Unit, onExport: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Button(onClick = { onFilterChange(7) }) { Text("7d") }
-        Spacer(modifier = Modifier.width(8.dp))
-        Button(onClick = { onFilterChange(30) }) { Text("30d") }
-        Spacer(modifier = Modifier.width(8.dp))
-        Button(onClick = { onFilterChange(Int.MAX_VALUE) }) { Text("All") }
-        Spacer(modifier = Modifier.weight(1f))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row {
+            Button(onClick = { onFilterChange(7) }) { Text("7d") }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = { onFilterChange(30) }) { Text("30d") }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = { onFilterChange(Int.MAX_VALUE) }) { Text("All") }
+        }
         Button(onClick = onExport) { Text("Export") }
     }
 }

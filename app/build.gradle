@@ -10,12 +10,12 @@ apply plugin: 'io.gitlab.arturbosch.detekt'
 apply plugin: 'org.jlleitschuh.gradle.ktlint'
 
 android {
-    compileSdkVersion 34
+    compileSdkVersion 37
 
     defaultConfig {
         applicationId "com.hardrivetech.t1dtracker"
         minSdkVersion 23
-        targetSdkVersion 34
+        targetSdkVersion 37
         versionCode 1
         versionName "0.1"
     }
@@ -66,6 +66,7 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += ["-XXLanguage:+UnnamedLocalVariables"]
     }
 
     namespace "com.hardrivetech.t1dtracker"
