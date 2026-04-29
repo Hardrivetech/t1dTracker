@@ -9,10 +9,10 @@ object AppLog {
             val f = cls.getField("DEBUG")
             f.getBoolean(null)
         } catch (e: ReflectiveOperationException) {
-            TelemetryUtil.recordException(e, "AppLog.isDebug detection failed")
+            Log.e("AppLog", "AppLog.isDebug detection failed", e)
             false
         } catch (e: SecurityException) {
-            TelemetryUtil.recordException(e, "AppLog.isDebug detection failed")
+            Log.e("AppLog", "AppLog.isDebug detection failed", e)
             false
         }
     }

@@ -242,16 +242,14 @@ fun InsulinCalculatorScreen(db: AppDatabase, prefs: PrefsRepository) {
                 val carbsVal = carbsText.toDoubleOrNull() ?: 0.0
                 val currentVal = currentText.toDoubleOrNull() ?: 0.0
                 val targetVal = targetText.toDoubleOrNull() ?: 0.0
-                val icrVal = icr
-                val isfVal = isf
 
                 val entry = InsulinEntry(
                     timestamp = System.currentTimeMillis(),
                     carbs = carbsVal,
-                    icr = icrVal,
+                    icr = icr,
                     currentGlucose = currentVal,
                     targetGlucose = targetVal,
-                    isf = isfVal,
+                    isf = isf,
                     carbDose = carbDose,
                     correctionDose = correctionDose,
                     totalDose = totalDose
