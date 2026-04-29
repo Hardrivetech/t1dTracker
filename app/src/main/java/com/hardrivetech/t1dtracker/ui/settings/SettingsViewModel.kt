@@ -2,6 +2,7 @@ package com.hardrivetech.t1dtracker.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hardrivetech.t1dtracker.data.AppDatabase
 import com.hardrivetech.t1dtracker.data.PrefsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,8 +22,12 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val prefs: PrefsRepository
+    private val prefs: PrefsRepository,
+    private val db: AppDatabase
 ) : ViewModel() {
+
+    fun getPrefsRepository() = prefs
+    fun getDatabase() = db
 
     val uiState: StateFlow<SettingsUiState> = combine(
         prefs.defaultICR,

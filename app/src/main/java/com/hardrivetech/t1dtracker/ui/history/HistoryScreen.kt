@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
@@ -34,6 +36,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hardrivetech.t1dtracker.LineChart
 import com.hardrivetech.t1dtracker.R
 import com.hardrivetech.t1dtracker.data.InsulinEntry
+import com.hardrivetech.t1dtracker.insulin.DoseInput
+import com.hardrivetech.t1dtracker.insulin.InsulinCalculator
 import com.hardrivetech.t1dtracker.ui.calculator.formatDose
 import com.hardrivetech.t1dtracker.ui.calculator.formatTime
 
@@ -48,6 +52,7 @@ fun HistoryScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<InsulinEntry?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         HistoryHeader(
@@ -94,10 +99,21 @@ fun HistoryScreen(
                     showEntryDialog = false
                 },
                 onDelete = { e ->
-                    viewModel.deleteEntry(e)
-                    showEntryDialog = false
-                    selectedEntry = null
+                    selectedEntry = e
+                    showDeleteConfirm = true
                 }
+            )
+        }
+
+        if (showDeleteConfirm && selectedEntry != null) {
+            DeleteConfirmationDialog(
+                entry = selectedEntry!!,
+                onConfirm = {
+                    viewModel.deleteEntry(selectedEntry!!)
+                    showDeleteConfirm = false
+                    selectedEntry = null
+                },
+                onDismiss = { showDeleteConfirm = false }
             )
         }
 
@@ -179,13 +195,14 @@ private fun EntryEditDialog(orig: InsulinEntry, onDismiss: () -> Unit, onSave: (
     var editCurrentText by remember { mutableStateOf(orig.currentGlucose.toString()) }
     var editTargetText by remember { mutableStateOf(orig.targetGlucose.toString()) }
     var editIsfText by remember { mutableStateOf(orig.isf.toString()) }
+    var editRoundingText by remember { mutableStateOf("0.5") } // Default rounding
     var editNotesText by remember { mutableStateOf(orig.notes ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.edit_entry_title)) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = editCarbsText,
                     onValueChange = { editCarbsText = it },
@@ -217,6 +234,12 @@ private fun EntryEditDialog(orig: InsulinEntry, onDismiss: () -> Unit, onSave: (
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
+                    value = editRoundingText,
+                    onValueChange = { editRoundingText = it },
+                    label = { Text(stringResource(R.string.rounding_label)) },
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                )
+                OutlinedTextField(
                     value = editNotesText,
                     onValueChange = { editNotesText = it },
                     label = { Text(stringResource(R.string.notes_label)) }
@@ -225,33 +248,48 @@ private fun EntryEditDialog(orig: InsulinEntry, onDismiss: () -> Unit, onSave: (
         },
         confirmButton = {
             TextButton(onClick = {
-                val newCarbs = editCarbsText.toDoubleOrNull() ?: orig.carbs
-                val newIcr = editIcrText.toDoubleOrNull() ?: orig.icr
-                val newCurrent = editCurrentText.toDoubleOrNull() ?: orig.currentGlucose
-                val newTarget = editTargetText.toDoubleOrNull() ?: orig.targetGlucose
-                val newIsf = editIsfText.toDoubleOrNull() ?: orig.isf
-
-                val newCarbDose = if (newIcr > 0.0) newCarbs / newIcr else 0.0
-                val newCorrection = if (newIsf > 0.0 && newCurrent > newTarget) {
-                    (newCurrent - newTarget) / newIsf
-                } else {
-                    0.0
-                }
-                val newTotal = newCarbDose + newCorrection
+                val input = DoseInput(
+                    carbs = editCarbsText.toDoubleOrNull() ?: orig.carbs,
+                    icr = editIcrText.toDoubleOrNull() ?: orig.icr,
+                    currentGlucose = editCurrentText.toDoubleOrNull() ?: orig.currentGlucose,
+                    targetGlucose = editTargetText.toDoubleOrNull() ?: orig.targetGlucose,
+                    isf = editIsfText.toDoubleOrNull() ?: orig.isf,
+                    rounding = editRoundingText.toDoubleOrNull() ?: 0.5
+                )
+                val result = InsulinCalculator.calculateDose(input)
 
                 val updated = orig.copy(
-                    carbs = newCarbs,
-                    icr = newIcr,
-                    currentGlucose = newCurrent,
-                    targetGlucose = newTarget,
-                    isf = newIsf,
-                    carbDose = newCarbDose,
-                    correctionDose = newCorrection,
-                    totalDose = newTotal,
+                    carbs = input.carbs,
+                    icr = input.icr,
+                    currentGlucose = input.currentGlucose,
+                    targetGlucose = input.targetGlucose,
+                    isf = input.isf,
+                    carbDose = result.carbDose,
+                    correctionDose = result.correctionDose,
+                    totalDose = result.totalDoseRounded,
                     notes = editNotesText.ifBlank { null }
                 )
                 onSave(updated)
             }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun DeleteConfirmationDialog(
+    entry: InsulinEntry,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Confirm Delete") },
+        text = { Text("Are you sure you want to delete this entry from ${formatTime(entry.timestamp)}?") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.delete), color = Color.Red) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }

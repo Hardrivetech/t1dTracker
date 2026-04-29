@@ -1,22 +1,17 @@
 buildscript {
-    ext.kotlin_version = '2.0.21'
     repositories {
         google()
         mavenCentral()
-        // Required for some Gradle plugins (detekt, ktlint)
         maven { url 'https://plugins.gradle.org/m2/' }
     }
     dependencies {
         classpath "com.android.tools.build:gradle:9.2.0"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlin_version"
-        // Google services and Firebase Crashlytics Gradle plugins
-        classpath 'com.google.gms:google-services:4.3.15'
-        classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.5'
-        classpath "com.google.dagger:hilt-android-gradle-plugin:2.55"
-        // Static analysis plugins
-        // Correct groupId for detekt Gradle plugin
-        classpath "io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.0"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.10"
+        classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.1.10"
+        classpath 'com.google.gms:google-services:4.4.4'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.7'
+        classpath "com.google.dagger:hilt-android-gradle-plugin:2.59.2"
+        classpath "io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.8"
         classpath "org.jlleitschuh.gradle:ktlint-gradle:11.6.0"
     }
 }
@@ -25,7 +20,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        // Include Gradle Plugin Portal mirror for plugins published there
         maven { url 'https://plugins.gradle.org/m2/' }
     }
 }

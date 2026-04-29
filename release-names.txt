@@ -1,0 +1,15 @@
+-Glucose
+-Insulin
+-Basal
+-Bolus
+-Trends
+-Steady
+-SteadyTrack
+-Balanced
+-OnTrack
+-InControl
+-Guided
+-Corrections
+-Carbs
+-Sensors
+-A1C

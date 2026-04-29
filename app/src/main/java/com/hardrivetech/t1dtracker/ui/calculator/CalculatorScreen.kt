@@ -11,11 +11,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarHost
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -30,6 +37,14 @@ fun InsulinCalculatorScreen(
     viewModel: InsulinCalculatorViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.message) {
+        uiState.message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessage()
+        }
+    }
 
     val currentInput = DoseInput(
         carbs = uiState.carbs.toDoubleOrNull() ?: 0.0,
@@ -50,38 +65,52 @@ fun InsulinCalculatorScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        Spacer(modifier = Modifier.height(12.dp))
-        NumberField(stringResource(R.string.carbs_label), uiState.carbs) { viewModel.onCarbsChange(it) }
-        NumberField(stringResource(R.string.icr_label), uiState.icr) { viewModel.onIcrChange(it) }
-        Spacer(modifier = Modifier.height(8.dp))
-        NumberField(stringResource(R.string.current_glucose_label), uiState.currentGlucose) { viewModel.onCurrentGlucoseChange(it) }
-        NumberField(stringResource(R.string.target_glucose_label), uiState.targetGlucose) { viewModel.onTargetGlucoseChange(it) }
-        NumberField(stringResource(R.string.isf_label), uiState.isf) { viewModel.onIsfChange(it) }
-        NumberField(stringResource(R.string.rounding_label), uiState.rounding) { viewModel.onRoundingChange(it) }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(result.carbDose)} U")
-        Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(result.correctionDose)} U")
-        Text(
-            stringResource(R.string.total_dose_label, currentInput.rounding) + ": ${formatDose(result.totalDoseRounded)} U",
-            style = MaterialTheme.typography.h6
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = { viewModel.onSaveClick() },
-            modifier = Modifier.fillMaxWidth()
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(padding)
+                .padding(16.dp)
         ) {
-            Text(stringResource(R.string.save_entry))
-        }
+            Spacer(modifier = Modifier.height(12.dp))
+            NumberField(stringResource(R.string.carbs_label), uiState.carbs) { viewModel.onCarbsChange(it) }
+            NumberField(stringResource(R.string.icr_label), uiState.icr) { viewModel.onIcrChange(it) }
+            Spacer(modifier = Modifier.height(8.dp))
+            NumberField(stringResource(R.string.current_glucose_label), uiState.currentGlucose) { viewModel.onCurrentGlucoseChange(it) }
+            NumberField(stringResource(R.string.target_glucose_label), uiState.targetGlucose) { viewModel.onTargetGlucoseChange(it) }
+            NumberField(stringResource(R.string.isf_label), uiState.isf) { viewModel.onIsfChange(it) }
+            NumberField(stringResource(R.string.rounding_label), uiState.rounding) { viewModel.onRoundingChange(it) }
 
-        Spacer(modifier = Modifier.height(24.dp))
-        RecentEntriesList(entries = uiState.entries)
+            if (result.warnings.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column {
+                    result.warnings.forEach { warning ->
+                        Text("⚠️ $warning", color = Color.Red, style = MaterialTheme.typography.caption)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("${stringResource(R.string.carb_dose_label)}: ${formatDose(result.carbDose)} U")
+            Text("${stringResource(R.string.correction_dose_label)}: ${formatDose(result.correctionDose)} U")
+            Text(
+                stringResource(R.string.total_dose_label, currentInput.rounding) + ": ${formatDose(result.totalDoseRounded)} U",
+                style = MaterialTheme.typography.h6
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { viewModel.onSaveClick() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.save_entry))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            RecentEntriesList(entries = uiState.entries)
+        }
     }
 }
 

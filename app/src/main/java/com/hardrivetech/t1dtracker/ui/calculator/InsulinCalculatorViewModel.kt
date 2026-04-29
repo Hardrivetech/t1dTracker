@@ -28,7 +28,8 @@ data class CalculatorUiState(
     val entries: List<InsulinEntry> = emptyList(),
     val showConfirmation: Boolean = false,
     val pendingInput: DoseInput? = null,
-    val pendingResult: DoseResult? = null
+    val pendingResult: DoseResult? = null,
+    val message: String? = null
 )
 
 @HiltViewModel
@@ -88,6 +89,10 @@ class InsulinCalculatorViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showConfirmation = false)
     }
 
+    fun clearMessage() {
+        _uiState.value = _uiState.value.copy(message = null)
+    }
+
     fun confirmSave() {
         val input = _uiState.value.pendingInput ?: return
         val result = _uiState.value.pendingResult ?: return
@@ -108,7 +113,8 @@ class InsulinCalculatorViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 showConfirmation = false,
                 carbs = "",
-                currentGlucose = ""
+                currentGlucose = "",
+                message = "Entry saved"
             )
         }
     }
