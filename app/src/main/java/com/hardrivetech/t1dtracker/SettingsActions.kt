@@ -110,8 +110,16 @@ object SettingsActions {
                     entries,
                     password
                 )
-            } catch (e: Exception) {
-                AppLog.e("SettingsActions", "createPreMigrationBackup failed: ${e.message}", e)
+            } catch (e: IOException) {
+                AppLog.e("SettingsActions", "createPreMigrationBackup I/O failed: ${e.message}", e)
+                TelemetryUtil.recordException(e, "createPreMigrationBackup failed")
+                null
+            } catch (e: GeneralSecurityException) {
+                AppLog.e("SettingsActions", "createPreMigrationBackup crypto failed: ${e.message}", e)
+                TelemetryUtil.recordException(e, "createPreMigrationBackup failed")
+                null
+            } catch (e: IllegalArgumentException) {
+                AppLog.e("SettingsActions", "createPreMigrationBackup invalid argument: ${e.message}", e)
                 TelemetryUtil.recordException(e, "createPreMigrationBackup failed")
                 null
             } finally {
@@ -160,71 +168,30 @@ object SettingsActions {
     }
 }
 
-// Wrappers for top-level migration helpers to provide a consistent API surface
-@Suppress("TooGenericExceptionCaught")
-suspend fun performMigration(context: Context, db: AppDatabase): Boolean {
-    return com.hardrivetech.t1dtracker.performMigration(context, db)
-}
-
-@Suppress("TooGenericExceptionCaught")
-suspend fun listPreMigrationBackups(context: Context): List<Long> {
-    return com.hardrivetech.t1dtracker.listPreMigrationBackups(context)
-}
-
-@Suppress("TooGenericExceptionCaught")
-suspend fun performRestoreMigration(context: Context, timestamp: Long): Boolean {
-    return com.hardrivetech.t1dtracker.performRestoreMigration(context, timestamp)
-}
-
-@Suppress("TooGenericExceptionCaught")
-suspend fun rotateKey(context: Context): Boolean {
-    return com.hardrivetech.t1dtracker.rotateKey(context)
-}
-
 suspend fun performMigration(context: Context, db: AppDatabase): Boolean {
     return withContext(Dispatchers.IO) {
-        try {
-            AppDatabase.migratePlaintextToEncrypted(context, db)
-        } catch (e: Exception) {
-            AppLog.e("SettingsActions", "performMigration failed: ${e.message}", e)
-            TelemetryUtil.recordException(e, "performMigration failed")
-            false
-        }
+        // AppDatabase.migratePlaintextToEncrypted already handles errors and logs accordingly
+        AppDatabase.migratePlaintextToEncrypted(context, db)
     }
 }
 
 suspend fun listPreMigrationBackups(context: Context): List<Long> {
     return withContext(Dispatchers.IO) {
-        try {
-            listMigrationBackups(context)
-        } catch (e: Exception) {
-            AppLog.e("SettingsActions", "listPreMigrationBackups failed: ${e.message}", e)
-            TelemetryUtil.recordException(e, "listPreMigrationBackups failed")
-            emptyList()
-        }
+        // underlying helper handles file IO safely
+        listMigrationBackups(context)
     }
 }
 
 suspend fun performRestoreMigration(context: Context, timestamp: Long): Boolean {
     return withContext(Dispatchers.IO) {
-        try {
-            restoreMigrationBackup(context, timestamp)
-        } catch (e: Exception) {
-            AppLog.e("SettingsActions", "performRestoreMigration failed: ${e.message}", e)
-            TelemetryUtil.recordException(e, "performRestoreMigration failed")
-            false
-        }
+        // DBMigrationApi.restoreMigrationBackup handles IO/reflection/security exceptions
+        restoreMigrationBackup(context, timestamp)
     }
 }
 
 suspend fun rotateKey(context: Context): Boolean {
     return withContext(Dispatchers.IO) {
-        try {
-            EncryptionUtil.rotateKey(context)
-        } catch (e: Exception) {
-            AppLog.e("SettingsActions", "rotateKey failed: ${e.message}", e)
-            TelemetryUtil.recordException(e, "rotateKey failed")
-            false
-        }
+        // EncryptionUtil.rotateKey already logs and handles expected exceptions
+        EncryptionUtil.rotateKey(context)
     }
 }

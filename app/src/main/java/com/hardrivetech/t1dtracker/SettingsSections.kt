@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.hardrivetech.t1dtracker.data.AppDatabase
 import com.hardrivetech.t1dtracker.data.PrefsRepository
 import com.hardrivetech.t1dtracker.util.PasswordStrength
-import kotlinx.coroutines.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsDefaultsSection(prefs: PrefsRepository, onNavigateBack: () -> Unit) {
@@ -85,7 +85,10 @@ fun SettingsDefaultsSection(prefs: PrefsRepository, onNavigateBack: () -> Unit) 
     ) {
         NumberField(stringResource(R.string.default_icr_label), icrDefaultText) { icrDefaultText = it }
         NumberField(stringResource(R.string.default_isf_label), isfDefaultText) { isfDefaultText = it }
-        NumberField(label = stringResource(R.string.default_target_label), value = targetDefaultText) { targetDefaultText = it }
+        NumberField(
+            label = stringResource(R.string.default_target_label),
+            value = targetDefaultText
+        ) { targetDefaultText = it }
 
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -106,7 +109,7 @@ fun SettingsDefaultsSection(prefs: PrefsRepository, onNavigateBack: () -> Unit) 
 @Composable
 fun SettingsBackupMigrationSection(db: AppDatabase, prefs: PrefsRepository) {
     // mark prefs in use to avoid detekt unused-parameter here
-    val _telemetry by prefs.telemetryConsent.collectAsState(initial = false)
+    prefs.hashCode()
 
     val context = LocalContext.current
     var backupPassword by remember { mutableStateOf("") }
@@ -181,7 +184,12 @@ private fun BackupPasswordStrengthSection(backupPassword: String, onPasswordChan
     )
     val assessment = PasswordStrength.assess(backupPassword)
     Column(modifier = Modifier.fillMaxWidth()) {
-        LinearProgressIndicator(progress = (assessment.score / 5f), modifier = Modifier.fillMaxWidth().height(8.dp))
+        LinearProgressIndicator(
+            progress = (assessment.score / 5f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+        )
         Spacer(modifier = Modifier.height(4.dp))
         val strengthColor = when (assessment.score) {
             0, 1 -> MaterialTheme.colors.error
@@ -190,7 +198,10 @@ private fun BackupPasswordStrengthSection(backupPassword: String, onPasswordChan
             4 -> MaterialTheme.colors.primary
             else -> MaterialTheme.colors.secondary
         }
-        Text("Strength: ${assessment.label}", color = strengthColor)
+        Text(
+            "Strength: ${assessment.label}",
+            color = strengthColor
+        )
     }
 }
 
@@ -204,7 +215,12 @@ private fun ExportAndImportButtons(db: AppDatabase, backupPassword: String) {
     ) { uri: android.net.Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val ok = SettingsActions.performExportToUri(context, db, uri, backupPassword.toCharArray())
+            val ok = SettingsActions.performExportToUri(
+                context,
+                db,
+                uri,
+                backupPassword.toCharArray()
+            )
             if (ok) {
                 Toast.makeText(context, context.getString(R.string.backup_exported), Toast.LENGTH_SHORT).show()
             } else {
@@ -217,10 +233,17 @@ private fun ExportAndImportButtons(db: AppDatabase, backupPassword: String) {
         }
     }
 
-    val openDocumentLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri: android.net.Uri? ->
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val ok = SettingsActions.performImportFromUri(context, db, uri, backupPassword.toCharArray())
+            val ok = SettingsActions.performImportFromUri(
+                context,
+                db,
+                uri,
+                backupPassword.toCharArray()
+            )
             if (ok) {
                 Toast.makeText(context, context.getString(R.string.import_success), Toast.LENGTH_SHORT).show()
             } else {
@@ -270,7 +293,11 @@ private fun MigrationControls(db: AppDatabase, backupPassword: String) {
         lastBackupPath = lastBackupPath,
         onExportNow = {
             scope.launch {
-                val file = SettingsActions.createPreMigrationBackup(context, db, backupPassword.toCharArray())
+                val file = SettingsActions.createPreMigrationBackup(
+                    context,
+                    db,
+                    backupPassword.toCharArray()
+                )
                 if (file != null) {
                     Toast.makeText(
                         context,
@@ -366,7 +393,11 @@ private fun RotateKeyControls() {
     var showRotateConfirm by remember { mutableStateOf(false) }
     var rotatingKeyInProgress by remember { mutableStateOf(false) }
 
-    Button(modifier = Modifier.fillMaxWidth(), enabled = !rotatingKeyInProgress, onClick = { showRotateConfirm = true }) {
+    Button(
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !rotatingKeyInProgress,
+        onClick = { showRotateConfirm = true }
+    ) {
         Text(
             stringResource(R.string.rotate_key)
         )
